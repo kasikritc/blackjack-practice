@@ -424,6 +424,12 @@ function buildSummary() {
   const sessions = firstValue("SELECT COUNT(*) AS value FROM sessions");
   const shoes = firstValue("SELECT COUNT(*) AS value FROM shoes");
   const hands = firstValue("SELECT COUNT(*) AS value FROM hands");
+  const totalPlayMs = firstValue(`
+    SELECT COALESCE(SUM(span_ms), 0) AS value FROM (
+      SELECT (julianday(MAX(completed_at)) - julianday(MIN(completed_at))) * 86400000 AS span_ms
+      FROM hands GROUP BY session_id
+    )
+  `);
   const depth = groupedMetric(checks, row => {
     if (row.shoe_depth_percent < 33) return "Early shoe";
     if (row.shoe_depth_percent < 67) return "Middle shoe";
@@ -445,7 +451,7 @@ function buildSummary() {
   return {
     masteryScore,
     level: masteryLevel(masteryScore, checks.length),
-    totals: { sessions, shoes, hands, cards, checks: checks.length },
+    totals: { sessions, shoes, hands, cards, checks: checks.length, totalPlayMs },
     accuracy: percent(correct, checks.length),
     recentAccuracy: percent(recentCorrect, recent.length),
     avgError,
@@ -633,7 +639,8 @@ function recentSessions() {
       COUNT(c.id) AS checks,
       ROUND(100.0 * AVG(CASE WHEN c.correct = 1 THEN 1 ELSE 0 END), 1) AS accuracy,
       ROUND(AVG(c.absolute_error), 2) AS avg_error,
-      ROUND(AVG(c.response_time_ms)) AS avg_response_ms
+      ROUND(AVG(c.response_time_ms)) AS avg_response_ms,
+      ROUND((julianday(MAX(h.completed_at)) - julianday(MIN(h.completed_at))) * 86400000) AS play_ms
     FROM sessions s
     LEFT JOIN shoes sh ON sh.session_id = s.id
     LEFT JOIN hands h ON h.session_id = s.id

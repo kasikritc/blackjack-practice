@@ -1080,7 +1080,8 @@ function analyticsMetricSections(summary) {
       metricTile("Cards counted", summary.totals?.cards || 0, "Visible cards"),
       metricTile("Count checks", summary.totals?.checks || 0, "Submitted answers"),
       metricTile("Hands played", summary.totals?.hands || 0, "Completed rounds"),
-      metricTile("Sessions", summary.totals?.sessions || 0, "Tracked visits")
+      metricTile("Sessions", summary.totals?.sessions || 0, "Tracked visits"),
+      metricTile("Total play time", formatDuration(summary.totals?.totalPlayMs), "Active time at the table")
     ])}
   `;
 }
@@ -1199,7 +1200,7 @@ function renderSessions(sessions) {
     <div class="session-row">
       <div>
         <strong>${formatDateTime(session.started_at)}</strong>
-        <span>${session.hands || 0} hands · ${session.checks || 0} checks · ${session.shoes || 0} shoes</span>
+        <span>${formatMinSec(session.play_ms)} · ${session.hands || 0} hands · ${session.checks || 0} checks · ${session.shoes || 0} shoes</span>
       </div>
       <div>
         <strong>${session.checks ? `${formatPercent(session.accuracy)}%` : "—"}</strong>
@@ -1252,6 +1253,27 @@ function formatCards(value) {
   if (!Number.isFinite(number)) return "0 cards";
   const rounded = Number.isInteger(number) ? String(number) : number.toFixed(1);
   return `${rounded} card${number === 1 ? "" : "s"}`;
+}
+
+function formatMinSec(ms) {
+  const number = Number(ms);
+  if (!Number.isFinite(number) || number <= 0) return "0m 0s";
+  const totalSeconds = Math.round(number / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds}s`;
+}
+
+function formatDuration(ms) {
+  const number = Number(ms);
+  if (!Number.isFinite(number) || number <= 0) return "0m";
+  const totalSeconds = Math.round(number / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }
 
 function formatMs(value) {

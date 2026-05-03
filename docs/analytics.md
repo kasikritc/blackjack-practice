@@ -149,8 +149,11 @@ The dashboard derives:
 - median and p90 response time
 - correct streaks
 - card/check/session/shoe volume
+- average, median, p90, and max recent cards between count checks
+- count checks per 100 visible cards
 - error-size buckets
 - likely error drivers by card group
+- quiz-spacing breakdown
 - actual deal speed breakdown
 - other-player-count breakdown
 - shoe-display-mode breakdown

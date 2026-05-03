@@ -1052,6 +1052,10 @@ function renderAnalyticsSummary(summary) {
     metricTile("Avg error", hasChecks ? formatNumber(summary.avgError) : "—", "Absolute count miss"),
     metricTile("Median speed", hasChecks ? formatMs(summary.medianResponse) : "—", "Answer response"),
     metricTile("P90 speed", hasChecks ? formatMs(summary.p90Response) : "—", "Slower responses"),
+    metricTile("Avg gap", hasChecks ? formatCards(summary.quizSpacing?.avgCardsPerCheck) : "—", "Cards per check"),
+    metricTile("P90 gap", hasChecks ? formatCards(summary.quizSpacing?.p90CardsPerCheck) : "—", "Longer quiz gaps"),
+    metricTile("Check rate", hasChecks ? `${formatNumber(summary.quizSpacing?.checksPer100Cards)} / 100` : "—", "Visible cards"),
+    metricTile("Max recent gap", hasChecks ? formatCards(summary.quizSpacing?.maxRecentGap) : "—", "Last 50 checks"),
     metricTile("Current streak", summary.currentStreak, "Correct checks"),
     metricTile("Best streak", summary.bestStreak, "Correct checks"),
     metricTile("No major miss", summary.noMajorErrorStreak, "Errors under 3"),
@@ -1096,6 +1100,7 @@ function renderBreakdowns(summary) {
       { label: "Major", checks: summary.errorBuckets?.major || 0 }
     ]],
     ["Likely error drivers", summary.errorDrivers || []],
+    ["Quiz spacing", summary.quizSpacing?.buckets || []],
     ["Actual deal speed", summary.speedBreakdown || []],
     ["Other players", summary.otherPlayers || []],
     ["Shoe display", summary.shoeDisplayModes || []],
@@ -1114,7 +1119,8 @@ function renderBreakdowns(summary) {
 function breakdownRow(row) {
   const value = row.accuracy === undefined ? row.checks : `${formatPercent(row.accuracy)}%`;
   const bar = row.accuracy === undefined ? Math.min(100, row.checks * 10) : row.accuracy;
-  const detail = row.avgError === undefined ? `${row.checks} checks` : `${row.checks} checks, ${formatNumber(row.avgError)} avg error`;
+  const risk = row.atRisk ? " · at risk" : "";
+  const detail = row.avgError === undefined ? `${row.checks} checks${risk}` : `${row.checks} checks, ${formatNumber(row.avgError)} avg error${risk}`;
   return `
     <div class="breakdown-row">
       <div>
@@ -1182,6 +1188,13 @@ function formatNumber(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "0";
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+
+function formatCards(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "0 cards";
+  const rounded = Number.isInteger(number) ? String(number) : number.toFixed(1);
+  return `${rounded} card${number === 1 ? "" : "s"}`;
 }
 
 function formatMs(value) {

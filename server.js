@@ -396,7 +396,19 @@ async function handleApi(req, res, url) {
 }
 
 function buildSummary() {
-  const checks = queryAll("SELECT * FROM count_checks ORDER BY created_at ASC");
+  const checks = queryAll(`
+    SELECT
+      c.*,
+      COALESCE(c.number_of_other_players, sh.number_of_other_players, s.initial_number_of_other_players) AS number_of_other_players,
+      COALESCE(c.shoe_display_mode, sh.shoe_display_mode, s.initial_shoe_display_mode) AS shoe_display_mode,
+      COALESCE(c.dealer_speed, sh.dealer_speed) AS dealer_speed,
+      sh.settings_json AS shoe_settings_json,
+      s.settings_json AS session_settings_json
+    FROM count_checks c
+    LEFT JOIN shoes sh ON sh.id = c.shoe_id
+    LEFT JOIN sessions s ON s.id = c.session_id
+    ORDER BY c.created_at ASC
+  `).map(enrichCheckSettings);
   const recent = checks.slice(-50);
   const correct = checks.filter(row => row.correct === 1).length;
   const recentCorrect = recent.filter(row => row.correct === 1).length;
@@ -427,7 +439,8 @@ function buildSummary() {
   const otherPlayers = groupedMetric(checks, row => otherPlayersLabel(row.number_of_other_players));
   const shoeDisplayModes = groupedMetric(checks, row => shoeDisplayLabel(row.shoe_display_mode));
   const errorDrivers = buildErrorDrivers();
-  const speedBreakdown = buildSpeedBreakdown();
+  const speedBreakdown = buildSpeedBreakdown(checks);
+  const quizSpacing = buildQuizSpacingMetrics(checks, cards);
 
   return {
     masteryScore,
@@ -455,8 +468,65 @@ function buildSummary() {
     shoeDisplayModes,
     errorDrivers,
     speedBreakdown,
+    quizSpacing,
     sessions: recentSessions()
   };
+}
+
+function buildQuizSpacingMetrics(checks, cards) {
+  const gaps = checks.map(row => Number(row.cards_since_previous_check)).filter(Number.isFinite);
+  const avgCardsPerCheck = average(gaps);
+  const medianCardsPerCheck = percentile(gaps, 0.5);
+  const p90CardsPerCheck = percentile(gaps, 0.9);
+  const maxRecentGap = gaps.slice(-50).reduce((max, value) => Math.max(max, value), 0);
+  const checksPer100Cards = cards ? round((checks.length / cards) * 100, 1) : 0;
+  const baselineAccuracy = percent(checks.filter(row => row.correct === 1).length, checks.length);
+  const baselineAvgError = average(checks.map(row => row.absolute_error));
+  const groups = groupedMetric(checks, row => quizSpacingLabel(row.cards_since_previous_check)).map(group => ({
+    ...group,
+    atRisk: group.checks >= 3 && (
+      group.avgError >= baselineAvgError + 0.5 ||
+      group.accuracy <= baselineAccuracy - 10
+    )
+  }));
+  const bucketOrder = ["1-5 cards", "6-10 cards", "11-15 cards", "16+ cards", "Unknown gap"];
+  const buckets = bucketOrder
+    .map(label => groups.find(group => group.label === label))
+    .filter(Boolean);
+
+  return {
+    avgCardsPerCheck,
+    medianCardsPerCheck,
+    p90CardsPerCheck,
+    maxRecentGap,
+    checksPer100Cards,
+    buckets
+  };
+}
+
+function enrichCheckSettings(row) {
+  const shoeSettings = parseSettingsJson(row.shoe_settings_json);
+  const sessionSettings = parseSettingsJson(row.session_settings_json);
+  return {
+    ...row,
+    number_of_other_players: firstPresent(row.number_of_other_players, shoeSettings.numberOfOtherPlayers, sessionSettings.numberOfOtherPlayers),
+    shoe_display_mode: firstPresent(row.shoe_display_mode, shoeSettings.shoeDisplayMode, sessionSettings.shoeDisplayMode),
+    dealer_speed: firstPresent(row.dealer_speed, shoeSettings.dealerSpeed, sessionSettings.dealerSpeed),
+    deal_delay_ms: firstPresent(row.deal_delay_ms, shoeSettings.dealDelayMs, sessionSettings.dealDelayMs)
+  };
+}
+
+function parseSettingsJson(value) {
+  if (!value) return {};
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+function firstPresent(...values) {
+  return values.find(value => value !== null && value !== undefined && value !== "");
 }
 
 function buildErrorDrivers() {
@@ -494,12 +564,13 @@ function buildErrorDrivers() {
   });
 }
 
-function buildSpeedBreakdown() {
+function buildSpeedBreakdown(checks) {
   const rows = queryAll(`
     SELECT
       c.id AS check_id,
       c.correct,
       c.absolute_error,
+      c.response_time_ms,
       cc.dealer_speed,
       cc.deal_delay_ms,
       AVG(cc.ms_since_previous_visible_card) AS avg_visible_gap_ms
@@ -508,8 +579,17 @@ function buildSpeedBreakdown() {
     GROUP BY c.id, cc.dealer_speed, cc.deal_delay_ms
     ORDER BY c.created_at ASC
   `);
-  return groupedMetric(rows, row => speedLabel(row.dealer_speed, row.deal_delay_ms)).map(group => {
-    const matching = rows.filter(row => speedLabel(row.dealer_speed, row.deal_delay_ms) === group.label);
+  const sourceRows = rows.length ? rows : checks.map(row => ({
+    check_id: row.id,
+    correct: row.correct,
+    absolute_error: row.absolute_error,
+    response_time_ms: row.response_time_ms,
+    dealer_speed: row.dealer_speed,
+    deal_delay_ms: row.deal_delay_ms,
+    avg_visible_gap_ms: null
+  }));
+  return groupedMetric(sourceRows, row => speedLabel(row.dealer_speed, row.deal_delay_ms)).map(group => {
+    const matching = sourceRows.filter(row => speedLabel(row.dealer_speed, row.deal_delay_ms) === group.label);
     return {
       ...group,
       avgVisibleGapMs: Math.round(average(matching.map(row => row.avg_visible_gap_ms)))
@@ -591,6 +671,7 @@ function cardGroup(hiLoValue, dealerHoleReveal) {
 
 function speedLabel(dealerSpeed, dealDelayMs) {
   const label = dealerSpeed || "custom";
+  if (dealDelayMs === null || dealDelayMs === undefined || dealDelayMs === "") return label;
   const delay = Number(dealDelayMs);
   if (!Number.isFinite(delay)) return label;
   return `${label} · ${delay} ms`;
@@ -610,6 +691,15 @@ function shoeDisplayLabel(mode) {
     hidden: "Hidden"
   };
   return labels[mode] || mode || "Unknown display";
+}
+
+function quizSpacingLabel(value) {
+  const cards = Number(value);
+  if (!Number.isFinite(cards)) return "Unknown gap";
+  if (cards <= 5) return "1-5 cards";
+  if (cards <= 10) return "6-10 cards";
+  if (cards <= 15) return "11-15 cards";
+  return "16+ cards";
 }
 
 function calculateMasteryScore(rows) {

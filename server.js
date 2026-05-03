@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   tracking_enabled INTEGER NOT NULL DEFAULT 1,
   app_version TEXT,
   user_agent TEXT,
+  initial_number_of_other_players INTEGER,
+  initial_shoe_display_mode TEXT,
   settings_json TEXT
 );
 CREATE TABLE IF NOT EXISTS shoes (
@@ -32,6 +34,8 @@ CREATE TABLE IF NOT EXISTS shoes (
   dealer_hits_soft_17 INTEGER,
   dealer_peek INTEGER,
   blackjack_payout TEXT,
+  number_of_other_players INTEGER,
+  shoe_display_mode TEXT,
   count_check_mode TEXT,
   dealer_speed TEXT,
   cards_dealt INTEGER DEFAULT 0,
@@ -73,6 +77,8 @@ CREATE TABLE IF NOT EXISTS card_observations (
   dealer_hole_reveal INTEGER DEFAULT 0,
   shoe_depth_percent REAL,
   decks_remaining REAL,
+  number_of_other_players INTEGER,
+  shoe_display_mode TEXT,
   dealer_speed TEXT,
   deal_delay_ms INTEGER,
   player_think_delay_ms INTEGER,
@@ -100,6 +106,8 @@ CREATE TABLE IF NOT EXISTS count_checks (
   net_count_delta INTEGER,
   shoe_depth_percent REAL,
   decks_remaining REAL,
+  number_of_other_players INTEGER,
+  shoe_display_mode TEXT,
   count_check_mode TEXT,
   dealer_speed TEXT,
   FOREIGN KEY (session_id) REFERENCES sessions(id),
@@ -120,6 +128,8 @@ CREATE TABLE IF NOT EXISTS count_check_cards (
   seat_role TEXT,
   seat_name TEXT,
   dealer_hole_reveal INTEGER DEFAULT 0,
+  number_of_other_players INTEGER,
+  shoe_display_mode TEXT,
   dealer_speed TEXT,
   deal_delay_ms INTEGER,
   player_think_delay_ms INTEGER,
@@ -133,7 +143,8 @@ CREATE TABLE IF NOT EXISTS count_check_cards (
 `;
 
 runSql(schema);
-migrateSchema();
+ensureSchemaColumns();
+cleanupEmptySessions();
 
 startServer(PORT);
 
@@ -163,8 +174,16 @@ function createHttpServer() {
   });
 }
 
-function migrateSchema() {
+function ensureSchemaColumns() {
+  ensureColumn("sessions", "initial_number_of_other_players", "INTEGER");
+  ensureColumn("sessions", "initial_shoe_display_mode", "TEXT");
+  ensureColumn("shoes", "number_of_other_players", "INTEGER");
+  ensureColumn("shoes", "shoe_display_mode", "TEXT");
+  ensureColumn("count_checks", "number_of_other_players", "INTEGER");
+  ensureColumn("count_checks", "shoe_display_mode", "TEXT");
   for (const table of ["card_observations", "count_check_cards"]) {
+    ensureColumn(table, "number_of_other_players", "INTEGER");
+    ensureColumn(table, "shoe_display_mode", "TEXT");
     ensureColumn(table, "dealer_speed", "TEXT");
     ensureColumn(table, "deal_delay_ms", "INTEGER");
     ensureColumn(table, "player_think_delay_ms", "INTEGER");
@@ -181,6 +200,19 @@ function ensureColumn(table, column, definition) {
   }
 }
 
+function cleanupEmptySessions() {
+  const emptySessionWhere = `
+    NOT EXISTS (SELECT 1 FROM card_observations co WHERE co.session_id = sessions.id)
+    AND NOT EXISTS (SELECT 1 FROM count_checks cc WHERE cc.session_id = sessions.id)
+    AND NOT EXISTS (SELECT 1 FROM hands h WHERE h.session_id = sessions.id)
+  `;
+  runSql(`
+    DELETE FROM shoes
+    WHERE session_id IN (SELECT id FROM sessions WHERE ${emptySessionWhere});
+    DELETE FROM sessions WHERE ${emptySessionWhere};
+  `);
+}
+
 async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/sessions") {
     const body = await readJson(req);
@@ -188,6 +220,8 @@ async function handleApi(req, res, url) {
       tracking_enabled: 1,
       app_version: body.appVersion || "0.1.0",
       user_agent: body.userAgent || "",
+      initial_number_of_other_players: body.settings?.numberOfOtherPlayers,
+      initial_shoe_display_mode: body.settings?.shoeDisplayMode,
       settings_json: JSON.stringify(body.settings || {})
     });
     sendJson(res, 201, { id: row.id, trackingEnabled: true });
@@ -215,6 +249,8 @@ async function handleApi(req, res, url) {
       dealer_hits_soft_17: settings.dealerHitsSoft17 ? 1 : 0,
       dealer_peek: settings.dealerPeek ? 1 : 0,
       blackjack_payout: settings.blackjackPayout,
+      number_of_other_players: settings.numberOfOtherPlayers,
+      shoe_display_mode: settings.shoeDisplayMode,
       count_check_mode: settings.countCheckMode,
       dealer_speed: settings.dealerSpeed,
       settings_json: JSON.stringify(settings)
@@ -270,6 +306,8 @@ async function handleApi(req, res, url) {
       dealer_hole_reveal: body.dealerHoleReveal ? 1 : 0,
       shoe_depth_percent: body.shoeDepthPercent,
       decks_remaining: body.decksRemaining,
+      number_of_other_players: body.numberOfOtherPlayers,
+      shoe_display_mode: body.shoeDisplayMode,
       dealer_speed: body.dealerSpeed,
       deal_delay_ms: body.dealDelayMs,
       player_think_delay_ms: body.playerThinkDelayMs,
@@ -299,6 +337,8 @@ async function handleApi(req, res, url) {
       net_count_delta: body.netCountDelta,
       shoe_depth_percent: body.shoeDepthPercent,
       decks_remaining: body.decksRemaining,
+      number_of_other_players: body.numberOfOtherPlayers,
+      shoe_display_mode: body.shoeDisplayMode,
       count_check_mode: body.countCheckMode,
       dealer_speed: body.dealerSpeed
     });
@@ -317,6 +357,8 @@ async function handleApi(req, res, url) {
         seat_role: card.seatRole,
         seat_name: card.seatName,
         dealer_hole_reveal: card.dealerHoleReveal ? 1 : 0,
+        number_of_other_players: card.numberOfOtherPlayers,
+        shoe_display_mode: card.shoeDisplayMode,
         dealer_speed: card.dealerSpeed,
         deal_delay_ms: card.dealDelayMs,
         player_think_delay_ms: card.playerThinkDelayMs,
@@ -382,6 +424,8 @@ function buildSummary() {
     return "Count 6+";
   });
   const promptTypes = groupedMetric(checks, row => row.prompt_source || "unknown");
+  const otherPlayers = groupedMetric(checks, row => otherPlayersLabel(row.number_of_other_players));
+  const shoeDisplayModes = groupedMetric(checks, row => shoeDisplayLabel(row.shoe_display_mode));
   const errorDrivers = buildErrorDrivers();
   const speedBreakdown = buildSpeedBreakdown();
 
@@ -407,6 +451,8 @@ function buildSummary() {
     depth,
     pressure,
     promptTypes,
+    otherPlayers,
+    shoeDisplayModes,
     errorDrivers,
     speedBreakdown,
     sessions: recentSessions()
@@ -548,6 +594,22 @@ function speedLabel(dealerSpeed, dealDelayMs) {
   const delay = Number(dealDelayMs);
   if (!Number.isFinite(delay)) return label;
   return `${label} · ${delay} ms`;
+}
+
+function otherPlayersLabel(value) {
+  const count = Number(value);
+  if (!Number.isFinite(count)) return "Unknown other players";
+  return `${count} other players`;
+}
+
+function shoeDisplayLabel(mode) {
+  const labels = {
+    decks: "Decks left",
+    numbers: "Card numbers",
+    graphic: "Tray graphic",
+    hidden: "Hidden"
+  };
+  return labels[mode] || mode || "Unknown display";
 }
 
 function calculateMasteryScore(rows) {

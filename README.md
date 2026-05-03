@@ -64,8 +64,12 @@ This version intentionally does not include accounts, real money, bankroll/betti
 
 Practice analytics are stored locally in `data/blackjack.sqlite`. The `data/` directory is ignored by git.
 
-Tracking starts on by default when the app loads. Turning tracking off preserves earlier data and stops recording new shoes, hands, visible cards, and count-check answers until it is turned back on.
+Tracking starts on by default when the app loads, but the SQLite session row is created only when the first visible card appears. Turning tracking off preserves earlier data and stops recording new shoes, hands, visible cards, and count-check answers until it is turned back on.
+
+Sessions with visible cards but no count checks are retained for exposure and volume analytics. Accuracy and mastery metrics remain unavailable until the first count check is submitted.
 
 Each submitted count check stores the exact visible-card sequence since the previous quiz. This powers error-driver analysis for low-card, high-card, neutral-card, and dealer-hole-reveal patterns.
 
 Each visible card also stores the speed settings active at the moment it appeared, plus the elapsed time since the previous visible card. This preserves mid-shoe speed changes for later accuracy analysis.
+
+See [`docs/analytics.md`](./docs/analytics.md) for the full SQLite analytics data dictionary. In analytics fields, `number_of_other_players` means automated non-user player seats only; it does not include the practitioner/user seat.

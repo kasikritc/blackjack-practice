@@ -58,6 +58,7 @@ const state = {
     currentHandRunningCountStart: 0,
     visibleOrder: 0,
     lastVisibleCardAt: null,
+    sessionPromise: null,
     countPromptOpenedAt: null,
     countPromptSource: "manual",
     dashboardLoaded: false
@@ -776,16 +777,7 @@ function toggleAnalytics(open) {
 async function initAnalytics() {
   updateTrackingUi();
   try {
-    const data = await apiRequest("/api/sessions", {
-      method: "POST",
-      body: {
-        appVersion: "0.1.0",
-        userAgent: navigator.userAgent,
-        settings: state.settings
-      }
-    });
-    state.analytics.sessionId = data.id;
-    state.analytics.trackingEnabled = data.trackingEnabled !== false;
+    await apiRequest("/api/analytics/summary");
     state.analytics.serverAvailable = true;
   } catch (error) {
     console.warn("Analytics unavailable", error);
@@ -807,7 +799,7 @@ async function apiRequest(path, options = {}) {
 }
 
 function analyticsShouldTrack() {
-  return state.analytics.serverAvailable && state.analytics.trackingEnabled && state.analytics.sessionId;
+  return state.analytics.serverAvailable && state.analytics.trackingEnabled;
 }
 
 function updateTrackingUi() {
@@ -817,25 +809,25 @@ function updateTrackingUi() {
   els.trackingToggleButton.classList.toggle("is-off", !state.analytics.trackingEnabled);
   if (!available) {
     els.trackingStatus.textContent = "Tracking unavailable until the local API starts.";
-  } else if (state.analytics.trackingEnabled) {
+  } else if (state.analytics.trackingEnabled && state.analytics.sessionId) {
     els.trackingStatus.textContent = `Tracking session #${state.analytics.sessionId}`;
+  } else if (state.analytics.trackingEnabled) {
+    els.trackingStatus.textContent = "Tracking ready. Session starts on first visible card.";
   } else {
     els.trackingStatus.textContent = "Tracking paused. Practice continues without new data.";
   }
 }
 
 async function toggleTracking() {
-  if (!state.analytics.serverAvailable || !state.analytics.sessionId) return;
+  if (!state.analytics.serverAvailable) return;
   state.analytics.trackingEnabled = !state.analytics.trackingEnabled;
   updateTrackingUi();
+  if (!state.analytics.sessionId) return;
   try {
     await apiRequest(`/api/sessions/${state.analytics.sessionId}`, {
       method: "PATCH",
       body: { trackingEnabled: state.analytics.trackingEnabled }
     });
-    if (state.analytics.trackingEnabled && state.shoe && !state.analytics.currentShoeId) {
-      analyticsStartShoe();
-    }
   } catch (error) {
     console.warn("Could not update tracking state", error);
     state.analytics.trackingEnabled = !state.analytics.trackingEnabled;
@@ -847,11 +839,43 @@ function analyticsStartShoe() {
   state.analytics.currentShoeId = null;
   state.analytics.visibleOrder = 0;
   state.analytics.lastVisibleCardAt = null;
-  if (!analyticsShouldTrack()) return;
+  state.analytics.shoePromise = null;
+}
+
+async function ensureAnalyticsSession() {
+  if (!analyticsShouldTrack()) return null;
+  if (state.analytics.sessionId) return state.analytics.sessionId;
+  if (state.analytics.sessionPromise) return state.analytics.sessionPromise;
+  state.analytics.sessionPromise = apiRequest("/api/sessions", {
+    method: "POST",
+    body: {
+      appVersion: "0.1.0",
+      userAgent: navigator.userAgent,
+      settings: state.settings
+    }
+  }).then(data => {
+    state.analytics.sessionId = data.id;
+    state.analytics.trackingEnabled = data.trackingEnabled !== false;
+    updateTrackingUi();
+    return data.id;
+  }).catch(error => {
+    console.warn("Could not start analytics session", error);
+    state.analytics.sessionPromise = null;
+    return null;
+  });
+  return state.analytics.sessionPromise;
+}
+
+async function ensureAnalyticsShoe() {
+  if (!analyticsShouldTrack()) return null;
+  if (state.analytics.currentShoeId) return state.analytics.currentShoeId;
+  if (state.analytics.shoePromise) return state.analytics.shoePromise;
+  const sessionId = await ensureAnalyticsSession();
+  if (!sessionId) return null;
   state.analytics.shoePromise = apiRequest("/api/events/shoe-started", {
     method: "POST",
     body: {
-      sessionId: state.analytics.sessionId,
+      sessionId,
       settings: state.settings
     }
   }).then(data => {
@@ -861,10 +885,11 @@ function analyticsStartShoe() {
     console.warn("Could not record shoe start", error);
     return null;
   });
+  return state.analytics.shoePromise;
 }
 
 function analyticsEndShoe() {
-  if (!analyticsShouldTrack() || !state.analytics.currentShoeId || !state.shoe) return;
+  if (!analyticsShouldTrack() || !state.analytics.sessionId || !state.analytics.currentShoeId || !state.shoe) return;
   apiRequest("/api/events/shoe-ended", {
     method: "PATCH",
     body: {
@@ -879,7 +904,6 @@ function analyticsEndShoe() {
 function analyticsRecordCard(card, seat, dealerHoleReveal) {
   if (!analyticsShouldTrack()) return;
   const payload = {
-    sessionId: state.analytics.sessionId,
     handNumber: state.handNumber,
     visibleOrder: card.analytics?.visibleOrder,
     rank: card.rank,
@@ -891,6 +915,8 @@ function analyticsRecordCard(card, seat, dealerHoleReveal) {
     dealerHoleReveal,
     shoeDepthPercent: shoeDepthPercent(),
     decksRemaining: decksRemaining(),
+    numberOfOtherPlayers: card.analytics?.numberOfOtherPlayers,
+    shoeDisplayMode: card.analytics?.shoeDisplayMode,
     dealerSpeed: card.analytics?.dealerSpeed,
     dealDelayMs: card.analytics?.dealDelayMs,
     playerThinkDelayMs: card.analytics?.playerThinkDelayMs,
@@ -902,7 +928,7 @@ function analyticsRecordCard(card, seat, dealerHoleReveal) {
     if (!shoeId) return;
     return apiRequest("/api/events/card-observed", {
       method: "POST",
-      body: { ...payload, shoeId }
+      body: { ...payload, sessionId: state.analytics.sessionId, shoeId }
     });
   }).catch(error => console.warn("Could not record card", error));
 }
@@ -910,7 +936,6 @@ function analyticsRecordCard(card, seat, dealerHoleReveal) {
 function analyticsRecordHand(outcome) {
   if (!analyticsShouldTrack()) return;
   const payload = {
-    sessionId: state.analytics.sessionId,
     handNumber: state.handNumber,
     durationMs: Date.now() - (state.analytics.currentHandStartedAt || Date.now()),
     outcome,
@@ -922,20 +947,19 @@ function analyticsRecordHand(outcome) {
     decksRemaining: decksRemaining()
   };
   withCurrentShoeId().then(shoeId => {
-    if (!shoeId) return;
+    if (!shoeId || !state.analytics.sessionId) return;
     return apiRequest("/api/events/hand-completed", {
       method: "POST",
-      body: { ...payload, shoeId }
+      body: { ...payload, sessionId: state.analytics.sessionId, shoeId }
     });
   }).catch(error => console.warn("Could not record hand", error));
 }
 
 function analyticsRecordCountCheck(details) {
-  if (!analyticsShouldTrack()) return;
+  if (!analyticsShouldTrack() || details.cardsSincePreviousCheck <= 0) return;
   const responseTimeMs = Date.now() - (state.analytics.countPromptOpenedAt || Date.now());
   const signedError = details.answer - state.runningCount;
   const payload = {
-    sessionId: state.analytics.sessionId,
     handNumber: state.handNumber,
     promptSource: state.analytics.countPromptSource,
     correctRunningCount: state.runningCount,
@@ -951,6 +975,8 @@ function analyticsRecordCountCheck(details) {
     decksRemaining: decksRemaining(),
     countCheckMode: state.settings.countCheckMode,
     dealerSpeed: state.settings.dealerSpeed,
+    numberOfOtherPlayers: state.settings.numberOfOtherPlayers,
+    shoeDisplayMode: state.settings.shoeDisplayMode,
     cards: state.visibleCardsSinceLastCheck.map(card => ({
       visibleOrder: card.analytics?.visibleOrder,
       rank: card.rank,
@@ -960,6 +986,8 @@ function analyticsRecordCountCheck(details) {
       seatRole: card.analytics?.seatRole || "unknown",
       seatName: card.analytics?.seatName || "Unknown",
       dealerHoleReveal: Boolean(card.analytics?.dealerHoleReveal),
+      numberOfOtherPlayers: card.analytics?.numberOfOtherPlayers,
+      shoeDisplayMode: card.analytics?.shoeDisplayMode,
       dealerSpeed: card.analytics?.dealerSpeed,
       dealDelayMs: card.analytics?.dealDelayMs,
       playerThinkDelayMs: card.analytics?.playerThinkDelayMs,
@@ -969,10 +997,10 @@ function analyticsRecordCountCheck(details) {
     }))
   };
   withCurrentShoeId().then(shoeId => {
-    if (!shoeId) return;
+    if (!shoeId || !state.analytics.sessionId) return;
     return apiRequest("/api/events/count-check-submitted", {
       method: "POST",
-      body: { ...payload, shoeId }
+      body: { ...payload, sessionId: state.analytics.sessionId, shoeId }
     });
   }).then(() => {
     if (els.analyticsPanel.classList.contains("open")) loadAnalyticsDashboard();
@@ -981,8 +1009,7 @@ function analyticsRecordCountCheck(details) {
 
 async function withCurrentShoeId() {
   if (state.analytics.currentShoeId) return state.analytics.currentShoeId;
-  if (state.analytics.shoePromise) return state.analytics.shoePromise;
-  return null;
+  return ensureAnalyticsShoe();
 }
 
 function shoeDepthPercent() {
@@ -1016,14 +1043,15 @@ async function loadAnalyticsDashboard() {
 }
 
 function renderAnalyticsSummary(summary) {
-  els.masteryScore.textContent = String(summary.masteryScore || 0);
-  els.masteryLevel.textContent = summary.level || "No data yet";
-  els.recentAccuracy.textContent = `${formatPercent(summary.recentAccuracy)}%`;
+  const hasChecks = (summary.totals?.checks || 0) > 0;
+  els.masteryScore.textContent = hasChecks ? String(summary.masteryScore || 0) : "—";
+  els.masteryLevel.textContent = hasChecks ? (summary.level || "No data yet") : "Needs count checks";
+  els.recentAccuracy.textContent = hasChecks ? `${formatPercent(summary.recentAccuracy)}%` : "—";
   els.analyticsMetrics.innerHTML = [
-    metricTile("Accuracy", `${formatPercent(summary.accuracy)}%`, "All count checks"),
-    metricTile("Avg error", formatNumber(summary.avgError), "Absolute count miss"),
-    metricTile("Median speed", formatMs(summary.medianResponse), "Answer response"),
-    metricTile("P90 speed", formatMs(summary.p90Response), "Slower responses"),
+    metricTile("Accuracy", hasChecks ? `${formatPercent(summary.accuracy)}%` : "—", "All count checks"),
+    metricTile("Avg error", hasChecks ? formatNumber(summary.avgError) : "—", "Absolute count miss"),
+    metricTile("Median speed", hasChecks ? formatMs(summary.medianResponse) : "—", "Answer response"),
+    metricTile("P90 speed", hasChecks ? formatMs(summary.p90Response) : "—", "Slower responses"),
     metricTile("Current streak", summary.currentStreak, "Correct checks"),
     metricTile("Best streak", summary.bestStreak, "Correct checks"),
     metricTile("No major miss", summary.noMajorErrorStreak, "Errors under 3"),
@@ -1069,6 +1097,8 @@ function renderBreakdowns(summary) {
     ]],
     ["Likely error drivers", summary.errorDrivers || []],
     ["Actual deal speed", summary.speedBreakdown || []],
+    ["Other players", summary.otherPlayers || []],
+    ["Shoe display", summary.shoeDisplayModes || []],
     ["Shoe depth", summary.depth || []],
     ["Count pressure", summary.pressure || []],
     ["Prompt type", summary.promptTypes || []]
@@ -1109,8 +1139,8 @@ function renderSessions(sessions) {
         <span>${session.hands || 0} hands · ${session.checks || 0} checks · ${session.shoes || 0} shoes</span>
       </div>
       <div>
-        <strong>${formatPercent(session.accuracy)}%</strong>
-        <span>${formatNumber(session.avg_error)} avg err · ${formatMs(session.avg_response_ms)}</span>
+        <strong>${session.checks ? `${formatPercent(session.accuracy)}%` : "—"}</strong>
+        <span>${session.checks ? `${formatNumber(session.avg_error)} avg err · ${formatMs(session.avg_response_ms)}` : "No checks yet"}</span>
       </div>
     </div>
   `).join("");
@@ -1133,7 +1163,9 @@ async function resetAnalyticsData() {
   try {
     await apiRequest("/api/analytics", { method: "DELETE" });
     state.analytics.sessionId = null;
+    state.analytics.sessionPromise = null;
     state.analytics.currentShoeId = null;
+    state.analytics.shoePromise = null;
     await initAnalytics();
     if (state.shoe) analyticsStartShoe();
     loadAnalyticsDashboard();
@@ -1171,6 +1203,8 @@ function formatDateTime(value) {
 
 function currentSpeedSnapshot() {
   return {
+    numberOfOtherPlayers: state.settings.numberOfOtherPlayers,
+    shoeDisplayMode: state.settings.shoeDisplayMode,
     dealerSpeed: state.settings.dealerSpeed,
     dealDelayMs: state.settings.dealDelayMs,
     playerThinkDelayMs: state.settings.playerThinkDelayMs,

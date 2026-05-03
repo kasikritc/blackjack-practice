@@ -4,7 +4,7 @@
   "private": true,
   "description": "Mobile-friendly Hi-Lo blackjack card counting practice app.",
   "scripts": {
-    "dev": "python3 -m http.server 5173 --bind 0.0.0.0",
-    "check": "node --check app.js"
+    "dev": "node server.js",
+    "check": "node --check app.js && node --check server.js"
   }
 }

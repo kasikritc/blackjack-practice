@@ -382,7 +382,9 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/analytics/sessions") {
-    sendJson(res, 200, { sessions: recentSessions() });
+    const limit = clampInt(url.searchParams.get("limit"), 10, 1, 500);
+    const range = url.searchParams.get("range") || "all";
+    sendJson(res, 200, { sessions: recentSessions(limit, rangeToSinceIso(range)), limit, range });
     return;
   }
 
@@ -474,8 +476,7 @@ function buildSummary() {
     shoeDisplayModes,
     errorDrivers,
     speedBreakdown,
-    quizSpacing,
-    sessions: recentSessions()
+    quizSpacing
   };
 }
 
@@ -628,7 +629,9 @@ function buildTrends(range) {
   };
 }
 
-function recentSessions() {
+function recentSessions(limit = 10, sinceIso = null) {
+  const whereClause = sinceIso ? `WHERE s.started_at >= '${sinceIso.replace(/'/g, "")}'` : "";
+  const safeLimit = Math.max(1, Math.min(500, Math.floor(limit) || 10));
   return queryAll(`
     SELECT
       s.id,
@@ -645,10 +648,24 @@ function recentSessions() {
     LEFT JOIN shoes sh ON sh.session_id = s.id
     LEFT JOIN hands h ON h.session_id = s.id
     LEFT JOIN count_checks c ON c.session_id = s.id
+    ${whereClause}
     GROUP BY s.id
     ORDER BY s.started_at DESC
-    LIMIT 12
+    LIMIT ${safeLimit}
   `);
+}
+
+function clampInt(value, fallback, min, max) {
+  const n = Number.parseInt(value, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function rangeToSinceIso(range) {
+  const days = { "7d": 7, "30d": 30 }[range];
+  if (!days) return null;
+  const since = new Date(Date.now() - days * 86400000);
+  return since.toISOString().replace("T", " ").slice(0, 19);
 }
 
 function groupedMetric(rows, getKey) {

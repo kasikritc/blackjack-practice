@@ -61,7 +61,10 @@ const state = {
     sessionPromise: null,
     countPromptOpenedAt: null,
     countPromptSource: "manual",
-    dashboardLoaded: false
+    dashboardLoaded: false,
+    sessionLimit: 10,
+    sessionRange: "7d",
+    sessionPageSize: 10
   }
 };
 
@@ -80,7 +83,7 @@ function bindElements() {
     "settingsButton", "closeSettingsButton", "settingsPanel", "applySettingsButton",
     "analyticsButton", "closeAnalyticsButton", "analyticsPanel", "trackingStatus", "trackingToggleButton",
     "masteryScore", "masteryLevel", "recentAccuracy", "analyticsMetrics", "trendRange",
-    "trendChart", "breakdownGrid", "recentSessions", "refreshAnalyticsButton", "resetAnalyticsButton",
+    "trendChart", "breakdownGrid", "recentSessions", "sessionRangeSelect", "loadMoreSessionsButton", "refreshAnalyticsButton", "resetAnalyticsButton",
     "newShoeButton", "nextButton", "pauseButton", "manualCheckButton", "dealerSeat",
     "otherPlayers", "shoe", "discard", "status", "payoutLabel", "ruleLabel",
     "countDialog", "countForm", "countSignButton", "countInput", "countFeedback", "submitCountButton",
@@ -103,6 +106,15 @@ function bindEvents() {
   els.trackingToggleButton.addEventListener("click", toggleTracking);
   els.refreshAnalyticsButton.addEventListener("click", loadAnalyticsDashboard);
   els.resetAnalyticsButton.addEventListener("click", resetAnalyticsData);
+  els.sessionRangeSelect.addEventListener("change", () => {
+    state.analytics.sessionRange = els.sessionRangeSelect.value;
+    state.analytics.sessionLimit = state.analytics.sessionPageSize;
+    loadRecentSessions();
+  });
+  els.loadMoreSessionsButton.addEventListener("click", () => {
+    state.analytics.sessionLimit += state.analytics.sessionPageSize;
+    loadRecentSessions();
+  });
   els.closeSettingsButton.addEventListener("click", () => toggleSettings(false));
   els.applySettingsButton.addEventListener("click", applySettings);
   els.newShoeButton.addEventListener("click", startNewShoe);
@@ -1036,6 +1048,8 @@ async function loadAnalyticsDashboard() {
     renderAnalyticsSummary(summary);
     renderTrendChart(trends.days || []);
     state.analytics.dashboardLoaded = true;
+    state.analytics.sessionLimit = state.analytics.sessionPageSize;
+    await loadRecentSessions();
   } catch (error) {
     console.warn("Could not load analytics", error);
     renderEmptyAnalytics("Analytics data could not be loaded.");
@@ -1049,7 +1063,21 @@ function renderAnalyticsSummary(summary) {
   els.recentAccuracy.textContent = hasChecks ? `${formatPercent(summary.recentAccuracy)}%` : "—";
   els.analyticsMetrics.innerHTML = hasChecks ? analyticsMetricSections(summary) : `<p class="empty-state">No count checks yet.</p>`;
   renderBreakdowns(summary);
-  renderSessions(summary.sessions || []);
+}
+
+async function loadRecentSessions() {
+  if (!state.analytics.serverAvailable) return;
+  const limit = state.analytics.sessionLimit;
+  const range = state.analytics.sessionRange;
+  try {
+    const data = await apiRequest(`/api/analytics/sessions?limit=${limit + 1}&range=${encodeURIComponent(range)}`);
+    const all = data.sessions || [];
+    const hasMore = all.length > limit;
+    renderSessions(all.slice(0, limit), hasMore);
+  } catch (error) {
+    console.warn("Could not load sessions", error);
+    renderSessions([], false);
+  }
 }
 
 function analyticsMetricSections(summary) {
@@ -1191,23 +1219,78 @@ function breakdownRow(row) {
   `;
 }
 
-function renderSessions(sessions) {
+function renderSessions(sessions, hasMore) {
   if (!sessions.length) {
-    els.recentSessions.innerHTML = `<p class="empty-state">No practice sessions recorded yet.</p>`;
+    els.recentSessions.innerHTML = `<p class="empty-state">No sessions in this range.</p>`;
+    els.loadMoreSessionsButton.hidden = true;
     return;
   }
-  els.recentSessions.innerHTML = sessions.map(session => `
-    <div class="session-row">
-      <div>
-        <strong>${formatDateTime(session.started_at)}</strong>
-        <span>${formatMinSec(session.play_ms)} · ${session.hands || 0} hands · ${session.checks || 0} checks · ${session.shoes || 0} shoes</span>
+  const groups = groupSessionsByDay(sessions);
+  els.recentSessions.innerHTML = groups.map(group => `
+    <div class="session-day-header">${group.label}</div>
+    ${group.items.map(session => `
+      <div class="session-row">
+        <div>
+          <strong>${formatTimeOnly(session.started_at)}</strong>
+          <span>${formatMinSec(session.play_ms)} · ${session.hands || 0} hands · ${session.checks || 0} checks · ${session.shoes || 0} shoes</span>
+        </div>
+        <div>
+          <strong>${session.checks ? `${formatPercent(session.accuracy)}%` : "—"}</strong>
+          <span>${session.checks ? `${formatNumber(session.avg_error)} avg err · ${formatMs(session.avg_response_ms)}` : "No checks yet"}</span>
+        </div>
       </div>
-      <div>
-        <strong>${session.checks ? `${formatPercent(session.accuracy)}%` : "—"}</strong>
-        <span>${session.checks ? `${formatNumber(session.avg_error)} avg err · ${formatMs(session.avg_response_ms)}` : "No checks yet"}</span>
-      </div>
-    </div>
+    `).join("")}
   `).join("");
+  els.loadMoreSessionsButton.hidden = !hasMore;
+}
+
+function groupSessionsByDay(sessions) {
+  const buckets = new Map();
+  const order = [];
+  for (const session of sessions) {
+    const key = dayKey(session.started_at);
+    if (!buckets.has(key)) {
+      buckets.set(key, { label: formatDayHeader(session.started_at), items: [] });
+      order.push(key);
+    }
+    buckets.get(key).items.push(session);
+  }
+  return order.map(key => buckets.get(key));
+}
+
+function dayKey(value) {
+  const date = parseDate(value);
+  if (!date) return "unknown";
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function parseDate(value) {
+  if (!value) return null;
+  const date = new Date(value.includes("T") ? value : value.replace(" ", "T") + "Z");
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDayHeader(value) {
+  const date = parseDate(value);
+  if (!date) return "Unknown";
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (sameDay(date, today)) return "Today";
+  if (sameDay(date, yesterday)) return "Yesterday";
+  const opts = { month: "short", day: "numeric" };
+  if (date.getFullYear() !== today.getFullYear()) opts.year = "numeric";
+  return date.toLocaleDateString([], opts);
+}
+
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function formatTimeOnly(value) {
+  const date = parseDate(value);
+  if (!date) return "—";
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 function renderEmptyAnalytics(message) {

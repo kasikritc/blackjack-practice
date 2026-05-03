@@ -94,8 +94,23 @@
       </section>
 
       <section class="analytics-section" aria-label="Recent sessions">
-        <h3>Recent Sessions</h3>
-        <div id="recentSessions" class="session-list"></div>
+        <div class="session-section-header">
+          <h3>Recent Sessions</h3>
+          <label class="session-range">
+            <span class="visually-hidden">Date range</span>
+            <select id="sessionRangeSelect">
+              <option value="7d" selected>Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="all">All time</option>
+            </select>
+          </label>
+        </div>
+        <div class="session-list-scroll">
+          <div id="recentSessions" class="session-list"></div>
+          <button id="loadMoreSessionsButton" type="button" class="load-more-button" hidden>
+            <span>Show more</span>
+          </button>
+        </div>
       </section>
 
       <section class="analytics-section data-tools" aria-label="Data controls">

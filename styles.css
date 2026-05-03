@@ -930,16 +930,63 @@ h2 { font-size: 22px; }
   background: var(--gold);
 }
 
+.session-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-range select {
+  background: rgba(255,255,255,.06);
+  color: inherit;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.session-list-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.02);
+  padding: 6px;
+}
+
 .session-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
+}
+
+.session-day-header {
+  position: sticky;
+  top: -6px;
+  z-index: 1;
+  margin: 4px 0 2px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: rgba(20,20,20,.92);
+  backdrop-filter: blur(4px);
+  border-radius: 4px;
+}
+
+.session-day-header:first-child {
+  margin-top: 0;
 }
 
 .session-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 12px;
-  padding: 12px;
+  padding: 10px 12px;
+  align-items: center;
 }
 
 .session-row > div {
@@ -949,6 +996,37 @@ h2 { font-size: 22px; }
 
 .session-row > div:last-child {
   text-align: right;
+}
+
+.load-more-button {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px dashed rgba(255,255,255,.25);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.load-more-button:hover {
+  background: rgba(255,255,255,.05);
+  color: inherit;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .data-tools {

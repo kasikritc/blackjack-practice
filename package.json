@@ -1,0 +1,10 @@
+{
+  "name": "blackjack-counting-practice",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mobile-friendly Hi-Lo blackjack card counting practice app.",
+  "scripts": {
+    "dev": "python3 -m http.server 5173 --bind 0.0.0.0",
+    "check": "node --check app.js"
+  }
+}

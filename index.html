@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Blackjack Count Practice</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="app" class="app">
+      <section class="table-shell" aria-label="Blackjack table">
+        <header class="top-bar">
+          <div>
+            <p class="eyebrow">Hi-Lo Practice</p>
+            <h1>Blackjack Table</h1>
+          </div>
+          <button id="settingsButton" class="icon-button" type="button" aria-label="Open settings" title="Settings">⚙</button>
+        </header>
+
+        <section class="felt">
+          <div class="rail top-rail">
+            <div id="shoe" class="shoe-box"></div>
+            <div id="dealerSeat" class="seat dealer-seat"></div>
+            <div id="discard" class="shoe-box discard-box"></div>
+          </div>
+
+          <div id="otherPlayers" class="other-players"></div>
+
+          <div class="table-center">
+            <div class="felt-mark">
+              <span>Blackjack pays <strong id="payoutLabel">3:2</strong></span>
+              <span id="ruleLabel">Dealer hits soft 17</span>
+            </div>
+            <div id="status" class="status-pill">Ready</div>
+          </div>
+        </section>
+
+        <nav class="controls" aria-label="Game controls">
+          <button id="newShoeButton" class="primary" type="button"><span>New shoe</span></button>
+          <button id="nextButton" type="button"><span>Next hand</span></button>
+          <button id="pauseButton" type="button"><span>Pause</span></button>
+          <button id="manualCheckButton" type="button"><span>Count check</span></button>
+        </nav>
+        <p class="shortcut-help">Shortcuts: N/Enter next hand · W new shoe · P/Space pause · C count check · S settings</p>
+      </section>
+    </main>
+
+    <dialog id="countDialog" class="modal">
+      <form id="countForm" method="dialog" class="modal-card">
+        <p class="eyebrow">Count check</p>
+        <h2>What is the running count?</h2>
+        <p class="modal-hint">Keyboard: S toggles sign, Enter submits, C continues after feedback.</p>
+        <div class="count-entry">
+          <button id="countSignButton" type="button" aria-label="Toggle positive or negative count">+</button>
+          <input id="countInput" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="Running count answer" />
+        </div>
+        <div id="countFeedback" class="feedback" hidden></div>
+        <div class="modal-actions">
+          <button id="submitCountButton" class="primary" type="submit"><span>Submit</span></button>
+          <button id="continueButton" type="button" hidden><span>Continue</span></button>
+        </div>
+      </form>
+    </dialog>
+
+    <aside id="settingsPanel" class="settings-panel" aria-hidden="true">
+      <div class="settings-header">
+        <div>
+          <p class="eyebrow">Table rules</p>
+          <h2>Settings</h2>
+        </div>
+        <button id="closeSettingsButton" class="icon-button" type="button" aria-label="Close settings">×</button>
+      </div>
+      <p class="settings-hint">Keyboard: A applies settings, Esc closes.</p>
+
+      <div class="settings-grid">
+        <label>Decks
+          <select id="numberOfDecks">
+            <option>1</option><option>2</option><option>4</option><option selected>6</option><option>8</option>
+          </select>
+        </label>
+        <label>
+          <span class="label-title">Penetration
+            <span class="info-tip opens-left" tabindex="0" aria-label="Penetration is how far into the shoe cards are dealt before reshuffling. Higher penetration means more cards are seen before the shuffle.">i</span>
+          </span>
+          <input id="penetrationPercent" type="range" min="50" max="90" value="75" />
+          <span id="penetrationValue">75%</span>
+        </label>
+        <label>Dealer rule
+          <select id="dealerHitsSoft17">
+            <option value="true" selected>Hit soft 17</option>
+            <option value="false">Stand soft 17</option>
+          </select>
+        </label>
+        <label>
+          <span class="label-title">Dealer peek
+            <span class="info-tip opens-left" tabindex="0" aria-label="When enabled, the dealer checks for blackjack right away when showing an ace or ten-value card.">i</span>
+          </span>
+          <select id="dealerPeek">
+            <option value="true" selected>Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </label>
+        <label>Blackjack payout
+          <select id="blackjackPayout">
+            <option selected>3:2</option>
+            <option>6:5</option>
+          </select>
+        </label>
+        <label>Other players
+          <select id="numberOfOtherPlayers">
+            <option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
+          </select>
+        </label>
+        <label>Shoe display
+          <select id="shoeDisplayMode">
+            <option value="decks" selected>Decks left</option>
+            <option value="numbers">Card numbers</option>
+            <option value="graphic">Tray graphic</option>
+            <option value="hidden">Hidden</option>
+          </select>
+        </label>
+        <label>Dealer speed
+          <select id="dealerSpeed">
+            <option value="firstLesson">First lesson</option>
+            <option value="learning">Learning pace</option>
+            <option value="slow">Slow</option>
+            <option value="normal" selected>Normal</option>
+            <option value="fast">Fast</option>
+            <option value="manual">Manual step</option>
+          </select>
+        </label>
+        <label>Deal delay
+          <input id="dealDelayMs" type="range" min="150" max="5000" step="50" value="800" />
+          <span id="dealDelayValue">800 ms</span>
+        </label>
+        <label>Player thinking
+          <input id="playerThinkDelayMs" type="range" min="0" max="7000" step="100" value="1200" />
+          <span id="playerThinkDelayValue">1200 ms</span>
+        </label>
+        <label>Dealer pause
+          <input id="dealerThinkDelayMs" type="range" min="0" max="5000" step="100" value="700" />
+          <span id="dealerThinkDelayValue">700 ms</span>
+        </label>
+        <label>Quiz pause
+          <input id="countPromptDelayMs" type="range" min="0" max="10000" step="100" value="1800" />
+          <span id="countPromptDelayValue">1800 ms</span>
+        </label>
+        <label>Running count quiz
+          <select id="countCheckMode">
+            <option value="random" selected>Random during play</option>
+            <option value="everyRound">End of each hand</option>
+            <option value="everyNCards">Every N cards</option>
+            <option value="manual">Manual only</option>
+          </select>
+        </label>
+        <label>Card interval
+          <input id="countCheckCardInterval" type="number" min="3" max="30" value="10" />
+        </label>
+        <label>Shuffle behavior
+          <select id="shuffleImmediately">
+            <option value="false" selected>Finish round</option>
+            <option value="true">Immediately</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="toggle-grid">
+        <label><input id="surrenderAllowed" type="checkbox" /> Surrender</label>
+        <label><input id="doubleAfterSplit" type="checkbox" checked />
+          <span class="label-title">DAS
+            <span class="info-tip opens-left" tabindex="0" aria-label="DAS means double after split. When enabled, a player may double down after splitting a pair.">i</span>
+          </span>
+        </label>
+        <label><input id="resplitAces" type="checkbox" /> Resplit aces</label>
+        <label><input id="hitSplitAces" type="checkbox" /> Hit split aces</label>
+        <label><input id="sideBetsEnabled" type="checkbox" /> Side bets</label>
+        <label><input id="animationsEnabled" type="checkbox" checked /> Animation</label>
+      </div>
+
+      <button id="applySettingsButton" class="primary wide" type="button"><span>Apply and shuffle</span></button>
+    </aside>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

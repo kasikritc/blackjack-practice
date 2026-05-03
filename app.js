@@ -1047,22 +1047,62 @@ function renderAnalyticsSummary(summary) {
   els.masteryScore.textContent = hasChecks ? String(summary.masteryScore || 0) : "—";
   els.masteryLevel.textContent = hasChecks ? (summary.level || "No data yet") : "Needs count checks";
   els.recentAccuracy.textContent = hasChecks ? `${formatPercent(summary.recentAccuracy)}%` : "—";
-  els.analyticsMetrics.innerHTML = [
-    metricTile("Accuracy", hasChecks ? `${formatPercent(summary.accuracy)}%` : "—", "All count checks"),
-    metricTile("Avg error", hasChecks ? formatNumber(summary.avgError) : "—", "Absolute count miss"),
-    metricTile("Median speed", hasChecks ? formatMs(summary.medianResponse) : "—", "Answer response"),
-    metricTile("P90 speed", hasChecks ? formatMs(summary.p90Response) : "—", "Slower responses"),
-    metricTile("Avg gap", hasChecks ? formatCards(summary.quizSpacing?.avgCardsPerCheck) : "—", "Cards per check"),
-    metricTile("P90 gap", hasChecks ? formatCards(summary.quizSpacing?.p90CardsPerCheck) : "—", "Longer quiz gaps"),
-    metricTile("Check rate", hasChecks ? `${formatNumber(summary.quizSpacing?.checksPer100Cards)} / 100` : "—", "Visible cards"),
-    metricTile("Max recent gap", hasChecks ? formatCards(summary.quizSpacing?.maxRecentGap) : "—", "Last 50 checks"),
-    metricTile("Current streak", summary.currentStreak, "Correct checks"),
-    metricTile("Best streak", summary.bestStreak, "Correct checks"),
-    metricTile("No major miss", summary.noMajorErrorStreak, "Errors under 3"),
-    metricTile("Cards counted", summary.totals?.cards || 0, "Visible cards")
-  ].join("");
+  els.analyticsMetrics.innerHTML = hasChecks ? analyticsMetricSections(summary) : `<p class="empty-state">No count checks yet.</p>`;
   renderBreakdowns(summary);
   renderSessions(summary.sessions || []);
+}
+
+function analyticsMetricSections(summary) {
+  return `
+    <section class="analytics-priority" aria-label="What to focus on first">
+      ${priorityCard("Accuracy", `${formatPercent(summary.recentAccuracy)}%`, "Last 50 checks", priorityStatus(summary.recentAccuracy, 90, 75))}
+      ${priorityCard("Error control", formatNumber(summary.recentAvgError), "Recent average miss", errorStatus(summary.recentAvgError))}
+      ${priorityCard("Self-check spacing", formatCards(summary.quizSpacing?.medianCardsPerCheck), "Cards between your count checks", selfCheckSpacingStatus(summary.quizSpacing))}
+    </section>
+    ${metricGroup("Performance", [
+      metricTile("All-time accuracy", `${formatPercent(summary.accuracy)}%`, "Every count check"),
+      metricTile("Average error", formatNumber(summary.avgError), "Absolute count miss"),
+      metricTile("Median speed", formatMs(summary.medianResponse), "Typical answer time"),
+      metricTile("P90 speed", formatMs(summary.p90Response), "Slower responses")
+    ])}
+    ${metricGroup("Consistency", [
+      metricTile("Current streak", summary.currentStreak, "Correct checks"),
+      metricTile("Best streak", summary.bestStreak, "Correct checks"),
+      metricTile("No major miss", summary.noMajorErrorStreak, "Errors under 3")
+    ])}
+    ${metricGroup("Self-check spacing", [
+      metricTile("Typical gap", formatCards(summary.quizSpacing?.medianCardsPerCheck), "Median cards per check"),
+      metricTile("Average gap", formatCards(summary.quizSpacing?.avgCardsPerCheck), "Cards per check"),
+      metricTile("Check rate", `${formatNumber(summary.quizSpacing?.checksPer100Cards)} / 100`, "Visible cards"),
+      metricTile("Max recent gap", formatCards(summary.quizSpacing?.maxRecentGap), "Last 50 checks")
+    ])}
+    ${metricGroup("Practice volume", [
+      metricTile("Cards counted", summary.totals?.cards || 0, "Visible cards"),
+      metricTile("Count checks", summary.totals?.checks || 0, "Submitted answers"),
+      metricTile("Hands played", summary.totals?.hands || 0, "Completed rounds"),
+      metricTile("Sessions", summary.totals?.sessions || 0, "Tracked visits")
+    ])}
+  `;
+}
+
+function priorityCard(label, value, hint, status) {
+  const subtitle = status.hint || hint;
+  return `
+    <div class="priority-card ${status.className}">
+      <span>${label}</span>
+      <strong>${value}</strong>
+      <small>${status.text} · ${subtitle}</small>
+    </div>
+  `;
+}
+
+function metricGroup(title, tiles) {
+  return `
+    <section class="metric-group">
+      <h3>${title}</h3>
+      <div class="metric-grid">${tiles.join("")}</div>
+    </section>
+  `;
 }
 
 function metricTile(label, value, hint) {
@@ -1092,28 +1132,45 @@ function renderTrendChart(days) {
 }
 
 function renderBreakdowns(summary) {
-  const sections = [
-    ["Error size", [
-      { label: "Perfect", checks: summary.errorBuckets?.perfect || 0 },
-      { label: "Off by 1", checks: summary.errorBuckets?.one || 0 },
-      { label: "Off by 2", checks: summary.errorBuckets?.two || 0 },
-      { label: "Major", checks: summary.errorBuckets?.major || 0 }
+  const groups = [
+    ["Mistake patterns", [
+      ["Error size", [
+        { label: "Perfect", checks: summary.errorBuckets?.perfect || 0 },
+        { label: "Off by 1", checks: summary.errorBuckets?.one || 0 },
+        { label: "Off by 2", checks: summary.errorBuckets?.two || 0 },
+        { label: "Major", checks: summary.errorBuckets?.major || 0 }
+      ]],
+      ["Likely error drivers", summary.errorDrivers || []]
     ]],
-    ["Likely error drivers", summary.errorDrivers || []],
-    ["Quiz spacing", summary.quizSpacing?.buckets || []],
-    ["Actual deal speed", summary.speedBreakdown || []],
-    ["Other players", summary.otherPlayers || []],
-    ["Shoe display", summary.shoeDisplayModes || []],
-    ["Shoe depth", summary.depth || []],
-    ["Count pressure", summary.pressure || []],
-    ["Prompt type", summary.promptTypes || []]
+    ["Training pressure", [
+      ["Self-check spacing", summary.quizSpacing?.buckets || []],
+      ["Count pressure", summary.pressure || []],
+      ["Prompt type", summary.promptTypes || []]
+    ]],
+    ["Table conditions", [
+      ["Actual deal speed", summary.speedBreakdown || []],
+      ["Other players", summary.otherPlayers || []],
+      ["Shoe display", summary.shoeDisplayModes || []],
+      ["Shoe depth", summary.depth || []]
+    ]]
   ];
-  els.breakdownGrid.innerHTML = sections.map(([title, rows]) => `
-    <div class="breakdown-block">
+  els.breakdownGrid.innerHTML = groups.map(([title, sections]) => `
+    <section class="breakdown-family">
       <h4>${title}</h4>
+      <div class="breakdown-family-grid">
+        ${sections.map(([sectionTitle, rows]) => breakdownBlock(sectionTitle, rows)).join("")}
+      </div>
+    </section>
+  `).join("");
+}
+
+function breakdownBlock(title, rows) {
+  return `
+    <div class="breakdown-block">
+      <h5>${title}</h5>
       ${rows.length ? rows.map(row => breakdownRow(row)).join("") : `<p class="empty-state">No data</p>`}
     </div>
-  `).join("");
+  `;
 }
 
 function breakdownRow(row) {
@@ -1202,6 +1259,51 @@ function formatMs(value) {
   if (!Number.isFinite(number) || number <= 0) return "0 ms";
   if (number >= 1000) return `${(number / 1000).toFixed(1)} s`;
   return `${Math.round(number)} ms`;
+}
+
+function priorityStatus(value, strong, watch) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return { className: "is-watch", text: "Needs data" };
+  if (number >= strong) return { className: "is-strong", text: "Strong" };
+  if (number >= watch) return { className: "is-watch", text: "Watch" };
+  return { className: "is-risk", text: "Priority" };
+}
+
+function errorStatus(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return { className: "is-watch", text: "Needs data" };
+  if (number <= 0.5) return { className: "is-strong", text: "Strong" };
+  if (number <= 1.25) return { className: "is-watch", text: "Watch" };
+  return { className: "is-risk", text: "Priority" };
+}
+
+function selfCheckSpacingStatus(quizSpacing) {
+  const median = Number(quizSpacing?.medianCardsPerCheck);
+  const p90 = Number(quizSpacing?.p90CardsPerCheck);
+  if (!Number.isFinite(median) || !Number.isFinite(p90)) {
+    return { className: "is-watch", text: "Needs data", hint: "Submit more count checks to see spacing" };
+  }
+  const longBuckets = ["11-15 cards", "16+ cards"];
+  const hurting = (quizSpacing.buckets || []).find(bucket => bucket.atRisk && longBuckets.includes(bucket.label));
+  if (hurting) {
+    return {
+      className: "is-risk",
+      text: "Count slips at long gaps",
+      hint: `Accuracy drops at ${hurting.label} — practice holding the count longer`
+    };
+  }
+  if (p90 > 10) {
+    return {
+      className: "is-strong",
+      text: "Holding the count",
+      hint: `Accuracy steady across gaps up to ${formatCards(p90)}`
+    };
+  }
+  return {
+    className: "is-watch",
+    text: "Short gaps only",
+    hint: "Try longer stretches between checks to match table play"
+  };
 }
 
 function formatDateTime(value) {

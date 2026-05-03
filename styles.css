@@ -698,6 +698,7 @@ h2 { font-size: 22px; }
 }
 
 .analytics-hero > div,
+.priority-card,
 .metric-tile,
 .breakdown-block,
 .session-row {
@@ -715,6 +716,7 @@ h2 { font-size: 22px; }
 }
 
 .metric-label,
+.priority-card span,
 .metric-tile span,
 .session-row span,
 .breakdown-row small {
@@ -727,6 +729,64 @@ h2 { font-size: 22px; }
   font-size: clamp(38px, 9vw, 64px);
   line-height: .95;
   color: var(--gold);
+}
+
+.analytics-priority {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.priority-card {
+  min-height: 132px;
+  display: grid;
+  align-content: center;
+  gap: 7px;
+  padding: 16px;
+  border-left: 4px solid var(--gold);
+  background: linear-gradient(135deg, rgba(255,255,255,.09), rgba(255,255,255,.035));
+}
+
+.priority-card strong {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.priority-card small {
+  color: rgba(244,238,222,.78);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.priority-card.is-strong {
+  border-left-color: var(--good);
+}
+
+.priority-card.is-watch {
+  border-left-color: var(--gold);
+}
+
+.priority-card.is-risk {
+  border-left-color: var(--danger);
+}
+
+.analytics-metrics {
+  display: grid;
+  gap: 2px;
+}
+
+.metric-group {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.metric-group h3 {
+  margin: 0;
+  color: rgba(244,238,222,.92);
+  font-size: 13px;
+  text-transform: uppercase;
 }
 
 .metric-grid {
@@ -760,7 +820,8 @@ h2 { font-size: 22px; }
 }
 
 .analytics-section h3,
-.breakdown-block h4 {
+.breakdown-family h4,
+.breakdown-block h5 {
   margin: 0;
   letter-spacing: 0;
 }
@@ -769,10 +830,15 @@ h2 { font-size: 22px; }
   font-size: 16px;
 }
 
-.breakdown-block h4 {
+.breakdown-family h4 {
   font-size: 13px;
   color: var(--gold);
   text-transform: uppercase;
+}
+
+.breakdown-block h5 {
+  font-size: 13px;
+  color: rgba(244,238,222,.92);
 }
 
 .trend-chart {
@@ -811,7 +877,17 @@ h2 { font-size: 22px; }
 
 .breakdown-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.breakdown-family {
+  display: grid;
+  gap: 8px;
+}
+
+.breakdown-family-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1019,7 +1095,8 @@ select, input {
 
 @media (max-width: 620px) {
   .analytics-hero,
-  .breakdown-grid,
+  .analytics-priority,
+  .breakdown-family-grid,
   .session-row,
   .data-tools {
     grid-template-columns: 1fr;

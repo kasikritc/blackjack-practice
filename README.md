@@ -1,11 +1,11 @@
-# Blackjack Count Practice
+# Blackjack Practice
 
 Mobile-friendly Hi-Lo blackjack card counting practice app. It runs as a static local web app with no backend and no npm dependencies.
 
 ## Run
 
 ```bash
-cd /home/kasikritc/blackjack-counting-practice
+cd /home/kasikritc/blackjack-practice
 npm run dev
 ```
 

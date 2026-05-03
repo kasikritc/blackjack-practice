@@ -46,21 +46,40 @@ const state = {
   countPromptResolve: null,
   pauseResolvers: [],
   renderedCardKeys: new Set(),
-  handNumber: 0
+  handNumber: 0,
+  analytics: {
+    sessionId: null,
+    trackingEnabled: true,
+    serverAvailable: false,
+    currentShoeId: null,
+    currentHandStartedAt: null,
+    currentHandVisibleCards: 0,
+    currentHandCardsDealtStart: 0,
+    currentHandRunningCountStart: 0,
+    visibleOrder: 0,
+    lastVisibleCardAt: null,
+    countPromptOpenedAt: null,
+    countPromptSource: "manual",
+    dashboardLoaded: false
+  }
 };
 
 const els = {};
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   bindElements();
   loadSettings();
   bindEvents();
+  await initAnalytics();
   startNewShoe();
 });
 
 function bindElements() {
   for (const id of [
     "settingsButton", "closeSettingsButton", "settingsPanel", "applySettingsButton",
+    "analyticsButton", "closeAnalyticsButton", "analyticsPanel", "trackingStatus", "trackingToggleButton",
+    "masteryScore", "masteryLevel", "recentAccuracy", "analyticsMetrics", "trendRange",
+    "trendChart", "breakdownGrid", "recentSessions", "refreshAnalyticsButton", "resetAnalyticsButton",
     "newShoeButton", "nextButton", "pauseButton", "manualCheckButton", "dealerSeat",
     "otherPlayers", "shoe", "discard", "status", "payoutLabel", "ruleLabel",
     "countDialog", "countForm", "countSignButton", "countInput", "countFeedback", "submitCountButton",
@@ -78,6 +97,11 @@ function bindElements() {
 
 function bindEvents() {
   els.settingsButton.addEventListener("click", () => toggleSettings(true));
+  els.analyticsButton.addEventListener("click", () => toggleAnalytics(true));
+  els.closeAnalyticsButton.addEventListener("click", () => toggleAnalytics(false));
+  els.trackingToggleButton.addEventListener("click", toggleTracking);
+  els.refreshAnalyticsButton.addEventListener("click", loadAnalyticsDashboard);
+  els.resetAnalyticsButton.addEventListener("click", resetAnalyticsData);
   els.closeSettingsButton.addEventListener("click", () => toggleSettings(false));
   els.applySettingsButton.addEventListener("click", applySettings);
   els.newShoeButton.addEventListener("click", startNewShoe);
@@ -109,6 +133,7 @@ function bindEvents() {
   });
   els.shoeDisplayMode.addEventListener("change", applyShoeDisplayModeFromForm);
   els.dealerSpeed.addEventListener("change", handleSpeedPresetChange);
+  els.trendRange.addEventListener("change", loadAnalyticsDashboard);
 }
 
 function handleKeyboardShortcut(event) {
@@ -140,6 +165,14 @@ function handleKeyboardShortcut(event) {
     if (key === "a" && !isTyping) {
       event.preventDefault();
       applySettings();
+    }
+    return;
+  }
+
+  if (els.analyticsPanel.classList.contains("open")) {
+    if (key === "escape") {
+      event.preventDefault();
+      toggleAnalytics(false);
     }
     return;
   }
@@ -199,6 +232,7 @@ function shuffle(cards) {
 }
 
 function startNewShoe() {
+  analyticsEndShoe();
   resumePausedWaits();
   state.paused = false;
   state.shoe = makeShoe(state.settings.numberOfDecks, state.settings.penetrationPercent);
@@ -215,6 +249,7 @@ function startNewShoe() {
   els.pauseButton.querySelector("span").textContent = "Pause";
   setStatus(`New ${state.settings.numberOfDecks}-deck shoe shuffled. Cut card at ${state.settings.penetrationPercent}%.`);
   render();
+  analyticsStartShoe();
 }
 
 function clearTable() {
@@ -241,23 +276,31 @@ async function runRound() {
   setControls(false);
   clearTable();
   state.handNumber += 1;
+  state.analytics.currentHandStartedAt = Date.now();
+  state.analytics.currentHandVisibleCards = 0;
+  state.analytics.currentHandCardsDealtStart = state.shoe.cardsDealt;
+  state.analytics.currentHandRunningCountStart = state.runningCount;
   state.phase = "dealing";
   setStatus(`Hand ${state.handNumber}: dealing.`);
   render();
+  let handOutcome = "Round complete";
 
   try {
     await dealInitialCards();
     markNaturals();
     if (state.settings.dealerPeek && dealerHasBlackjackPeek()) {
       await revealDealerHole();
+      handOutcome = "Dealer blackjack";
       setStatus("Dealer blackjack. Round ends.");
     } else {
       await playPlayers();
       await playDealer();
-      setStatus(resolveSummary());
+      handOutcome = resolveSummary();
+      setStatus(handOutcome);
     }
 
     moveHandsToDiscard();
+    analyticsRecordHand(handOutcome);
     if (state.shoe.cutReached) {
       state.pendingShuffle = true;
       setStatus("Cut card reached. Shuffling after this round.");
@@ -265,7 +308,7 @@ async function runRound() {
         await maybePrompt(true);
       }
     } else if (state.settings.countCheckMode === "everyRound") {
-      await openCountCheck();
+      await openCountCheck("everyRound");
     }
   } catch (error) {
     console.error(error);
@@ -333,7 +376,7 @@ async function dealTo(seat, visible) {
   }
   card.visible = visible;
   seat.hand.push(card);
-  if (visible) countCard(card);
+  if (visible) countCard(card, seat, false);
   render();
   await maybePrompt(false);
   await waitForSpeed();
@@ -344,18 +387,34 @@ async function revealDealerHole() {
   const hole = state.dealer.hand.find(card => !card.visible);
   if (!hole) return;
   hole.visible = true;
-  countCard(hole);
+  countCard(hole, state.dealer, true);
   render();
   await maybePrompt(false);
   await waitForSpeed();
 }
 
-function countCard(card) {
+function countCard(card, seat, dealerHoleReveal) {
   if (!card.visible || card.counted) return;
   card.counted = true;
   state.runningCount += getHiLoValue(card);
+  state.analytics.visibleOrder += 1;
+  const observedAt = Date.now();
+  card.analytics = {
+    visibleOrder: state.analytics.visibleOrder,
+    hiLoValue: getHiLoValue(card),
+    runningCountAfter: state.runningCount,
+    seatRole: seat?.role || "unknown",
+    seatName: seat?.name || "Unknown",
+    dealerHoleReveal: Boolean(dealerHoleReveal),
+    observedAt,
+    msSincePreviousVisibleCard: state.analytics.lastVisibleCardAt ? observedAt - state.analytics.lastVisibleCardAt : null,
+    ...currentSpeedSnapshot()
+  };
+  state.analytics.lastVisibleCardAt = observedAt;
   state.visibleCardsSinceLastCheck.push(card);
   state.visibleCardsSincePrompt += 1;
+  state.analytics.currentHandVisibleCards += 1;
+  analyticsRecordCard(card, seat, dealerHoleReveal);
 }
 
 function getHiLoValue(card) {
@@ -368,21 +427,21 @@ async function maybePrompt(force) {
   if (state.phase === "ready" || state.paused || els.countDialog.open) return;
   if (state.settings.countCheckMode === "manual") return;
   if (force) {
-    await openAutomaticCountCheck();
+    await openAutomaticCountCheck("cutCard");
     return;
   }
   if (state.settings.countCheckMode === "everyNCards" && state.visibleCardsSincePrompt >= state.settings.countCheckCardInterval) {
-    await openAutomaticCountCheck();
+    await openAutomaticCountCheck("everyNCards");
   }
   if (state.settings.countCheckMode === "random" && state.visibleCardsSincePrompt >= state.nextRandomPromptAt) {
-    await openAutomaticCountCheck();
+    await openAutomaticCountCheck("random");
   }
 }
 
-async function openAutomaticCountCheck() {
+async function openAutomaticCountCheck(source) {
   await waitForCountPrompt();
   if (state.paused || els.countDialog.open) return;
-  await openCountCheck();
+  await openCountCheck(source);
 }
 
 function waitForCountPrompt() {
@@ -390,13 +449,15 @@ function waitForCountPrompt() {
   return pauseAwareDelay(state.settings.countPromptDelayMs);
 }
 
-function openCountCheck() {
+function openCountCheck(source = "manual") {
   return new Promise(resolve => {
     if (els.countDialog.open) {
       resolve();
       return;
     }
     state.paused = true;
+    state.analytics.countPromptOpenedAt = Date.now();
+    state.analytics.countPromptSource = source;
     els.countSignButton.dataset.sign = "1";
     els.countSignButton.firstChild.textContent = "+";
     els.countInput.value = "";
@@ -424,6 +485,13 @@ function submitCountAnswer(event) {
   const delta = state.runningCount - state.lastCheckCount;
   const previousCount = state.lastCheckCount;
   const cards = state.visibleCardsSinceLastCheck;
+  analyticsRecordCountCheck({
+    answer,
+    correct,
+    delta,
+    previousCount,
+    cardsSincePreviousCheck: cards.length
+  });
   const cardRows = cards.length
     ? cards.map(card => `
         <span class="count-card">
@@ -687,8 +755,428 @@ function syncSettingsForm() {
 }
 
 function toggleSettings(open) {
+  els.settingsPanel.hidden = false;
   els.settingsPanel.classList.toggle("open", open);
   els.settingsPanel.setAttribute("aria-hidden", String(!open));
+  if (!open) setTimeout(() => {
+    if (!els.settingsPanel.classList.contains("open")) els.settingsPanel.hidden = true;
+  }, 180);
+}
+
+function toggleAnalytics(open) {
+  els.analyticsPanel.hidden = false;
+  els.analyticsPanel.classList.toggle("open", open);
+  els.analyticsPanel.setAttribute("aria-hidden", String(!open));
+  if (open) loadAnalyticsDashboard();
+  else setTimeout(() => {
+    if (!els.analyticsPanel.classList.contains("open")) els.analyticsPanel.hidden = true;
+  }, 180);
+}
+
+async function initAnalytics() {
+  updateTrackingUi();
+  try {
+    const data = await apiRequest("/api/sessions", {
+      method: "POST",
+      body: {
+        appVersion: "0.1.0",
+        userAgent: navigator.userAgent,
+        settings: state.settings
+      }
+    });
+    state.analytics.sessionId = data.id;
+    state.analytics.trackingEnabled = data.trackingEnabled !== false;
+    state.analytics.serverAvailable = true;
+  } catch (error) {
+    console.warn("Analytics unavailable", error);
+    state.analytics.serverAvailable = false;
+    state.analytics.trackingEnabled = false;
+  }
+  updateTrackingUi();
+}
+
+async function apiRequest(path, options = {}) {
+  const response = await fetch(path, {
+    method: options.method || "GET",
+    headers: { "Content-Type": "application/json" },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `Request failed: ${response.status}`);
+  return data;
+}
+
+function analyticsShouldTrack() {
+  return state.analytics.serverAvailable && state.analytics.trackingEnabled && state.analytics.sessionId;
+}
+
+function updateTrackingUi() {
+  const available = state.analytics.serverAvailable || state.analytics.sessionId;
+  els.trackingToggleButton.disabled = !available;
+  els.trackingToggleButton.querySelector("span").textContent = state.analytics.trackingEnabled ? "Tracking On" : "Tracking Off";
+  els.trackingToggleButton.classList.toggle("is-off", !state.analytics.trackingEnabled);
+  if (!available) {
+    els.trackingStatus.textContent = "Tracking unavailable until the local API starts.";
+  } else if (state.analytics.trackingEnabled) {
+    els.trackingStatus.textContent = `Tracking session #${state.analytics.sessionId}`;
+  } else {
+    els.trackingStatus.textContent = "Tracking paused. Practice continues without new data.";
+  }
+}
+
+async function toggleTracking() {
+  if (!state.analytics.serverAvailable || !state.analytics.sessionId) return;
+  state.analytics.trackingEnabled = !state.analytics.trackingEnabled;
+  updateTrackingUi();
+  try {
+    await apiRequest(`/api/sessions/${state.analytics.sessionId}`, {
+      method: "PATCH",
+      body: { trackingEnabled: state.analytics.trackingEnabled }
+    });
+    if (state.analytics.trackingEnabled && state.shoe && !state.analytics.currentShoeId) {
+      analyticsStartShoe();
+    }
+  } catch (error) {
+    console.warn("Could not update tracking state", error);
+    state.analytics.trackingEnabled = !state.analytics.trackingEnabled;
+    updateTrackingUi();
+  }
+}
+
+function analyticsStartShoe() {
+  state.analytics.currentShoeId = null;
+  state.analytics.visibleOrder = 0;
+  state.analytics.lastVisibleCardAt = null;
+  if (!analyticsShouldTrack()) return;
+  state.analytics.shoePromise = apiRequest("/api/events/shoe-started", {
+    method: "POST",
+    body: {
+      sessionId: state.analytics.sessionId,
+      settings: state.settings
+    }
+  }).then(data => {
+    state.analytics.currentShoeId = data.id;
+    return data.id;
+  }).catch(error => {
+    console.warn("Could not record shoe start", error);
+    return null;
+  });
+}
+
+function analyticsEndShoe() {
+  if (!analyticsShouldTrack() || !state.analytics.currentShoeId || !state.shoe) return;
+  apiRequest("/api/events/shoe-ended", {
+    method: "PATCH",
+    body: {
+      shoeId: state.analytics.currentShoeId,
+      cardsDealt: state.shoe.cardsDealt,
+      cutCardReached: state.shoe.cutReached,
+      finalRunningCount: state.runningCount
+    }
+  }).catch(error => console.warn("Could not record shoe end", error));
+}
+
+function analyticsRecordCard(card, seat, dealerHoleReveal) {
+  if (!analyticsShouldTrack()) return;
+  const payload = {
+    sessionId: state.analytics.sessionId,
+    handNumber: state.handNumber,
+    visibleOrder: card.analytics?.visibleOrder,
+    rank: card.rank,
+    suit: card.suit,
+    hiLoValue: card.analytics?.hiLoValue ?? getHiLoValue(card),
+    runningCountAfter: card.analytics?.runningCountAfter ?? state.runningCount,
+    seatRole: card.analytics?.seatRole || seat?.role || "unknown",
+    seatName: card.analytics?.seatName || seat?.name || "Unknown",
+    dealerHoleReveal,
+    shoeDepthPercent: shoeDepthPercent(),
+    decksRemaining: decksRemaining(),
+    dealerSpeed: card.analytics?.dealerSpeed,
+    dealDelayMs: card.analytics?.dealDelayMs,
+    playerThinkDelayMs: card.analytics?.playerThinkDelayMs,
+    dealerThinkDelayMs: card.analytics?.dealerThinkDelayMs,
+    countPromptDelayMs: card.analytics?.countPromptDelayMs,
+    msSincePreviousVisibleCard: card.analytics?.msSincePreviousVisibleCard
+  };
+  withCurrentShoeId().then(shoeId => {
+    if (!shoeId) return;
+    return apiRequest("/api/events/card-observed", {
+      method: "POST",
+      body: { ...payload, shoeId }
+    });
+  }).catch(error => console.warn("Could not record card", error));
+}
+
+function analyticsRecordHand(outcome) {
+  if (!analyticsShouldTrack()) return;
+  const payload = {
+    sessionId: state.analytics.sessionId,
+    handNumber: state.handNumber,
+    durationMs: Date.now() - (state.analytics.currentHandStartedAt || Date.now()),
+    outcome,
+    cardsDealt: state.shoe.cardsDealt - state.analytics.currentHandCardsDealtStart,
+    visibleCardsCounted: state.analytics.currentHandVisibleCards,
+    runningCountBefore: state.analytics.currentHandRunningCountStart,
+    runningCountAfter: state.runningCount,
+    shoeDepthPercent: shoeDepthPercent(),
+    decksRemaining: decksRemaining()
+  };
+  withCurrentShoeId().then(shoeId => {
+    if (!shoeId) return;
+    return apiRequest("/api/events/hand-completed", {
+      method: "POST",
+      body: { ...payload, shoeId }
+    });
+  }).catch(error => console.warn("Could not record hand", error));
+}
+
+function analyticsRecordCountCheck(details) {
+  if (!analyticsShouldTrack()) return;
+  const responseTimeMs = Date.now() - (state.analytics.countPromptOpenedAt || Date.now());
+  const signedError = details.answer - state.runningCount;
+  const payload = {
+    sessionId: state.analytics.sessionId,
+    handNumber: state.handNumber,
+    promptSource: state.analytics.countPromptSource,
+    correctRunningCount: state.runningCount,
+    userAnswer: details.answer,
+    signedError,
+    absoluteError: Math.abs(signedError),
+    correct: details.correct,
+    responseTimeMs,
+    cardsSincePreviousCheck: details.cardsSincePreviousCheck,
+    previousCount: details.previousCount,
+    netCountDelta: details.delta,
+    shoeDepthPercent: shoeDepthPercent(),
+    decksRemaining: decksRemaining(),
+    countCheckMode: state.settings.countCheckMode,
+    dealerSpeed: state.settings.dealerSpeed,
+    cards: state.visibleCardsSinceLastCheck.map(card => ({
+      visibleOrder: card.analytics?.visibleOrder,
+      rank: card.rank,
+      suit: card.suit,
+      hiLoValue: card.analytics?.hiLoValue ?? getHiLoValue(card),
+      runningCountAfter: card.analytics?.runningCountAfter,
+      seatRole: card.analytics?.seatRole || "unknown",
+      seatName: card.analytics?.seatName || "Unknown",
+      dealerHoleReveal: Boolean(card.analytics?.dealerHoleReveal),
+      dealerSpeed: card.analytics?.dealerSpeed,
+      dealDelayMs: card.analytics?.dealDelayMs,
+      playerThinkDelayMs: card.analytics?.playerThinkDelayMs,
+      dealerThinkDelayMs: card.analytics?.dealerThinkDelayMs,
+      countPromptDelayMs: card.analytics?.countPromptDelayMs,
+      msSincePreviousVisibleCard: card.analytics?.msSincePreviousVisibleCard
+    }))
+  };
+  withCurrentShoeId().then(shoeId => {
+    if (!shoeId) return;
+    return apiRequest("/api/events/count-check-submitted", {
+      method: "POST",
+      body: { ...payload, shoeId }
+    });
+  }).then(() => {
+    if (els.analyticsPanel.classList.contains("open")) loadAnalyticsDashboard();
+  }).catch(error => console.warn("Could not record count check", error));
+}
+
+async function withCurrentShoeId() {
+  if (state.analytics.currentShoeId) return state.analytics.currentShoeId;
+  if (state.analytics.shoePromise) return state.analytics.shoePromise;
+  return null;
+}
+
+function shoeDepthPercent() {
+  if (!state.shoe) return 0;
+  const total = Math.max(1, state.settings.numberOfDecks * 52);
+  return Math.round((state.shoe.cardsDealt / total) * 1000) / 10;
+}
+
+function decksRemaining() {
+  if (!state.shoe) return 0;
+  return Math.round((state.shoe.cards.length / 52) * 10) / 10;
+}
+
+async function loadAnalyticsDashboard() {
+  if (!state.analytics.serverAvailable) {
+    renderEmptyAnalytics("Start the app with npm run dev to enable SQLite analytics.");
+    return;
+  }
+  try {
+    const [summary, trends] = await Promise.all([
+      apiRequest("/api/analytics/summary"),
+      apiRequest(`/api/analytics/trends?range=${encodeURIComponent(els.trendRange.value)}`)
+    ]);
+    renderAnalyticsSummary(summary);
+    renderTrendChart(trends.days || []);
+    state.analytics.dashboardLoaded = true;
+  } catch (error) {
+    console.warn("Could not load analytics", error);
+    renderEmptyAnalytics("Analytics data could not be loaded.");
+  }
+}
+
+function renderAnalyticsSummary(summary) {
+  els.masteryScore.textContent = String(summary.masteryScore || 0);
+  els.masteryLevel.textContent = summary.level || "No data yet";
+  els.recentAccuracy.textContent = `${formatPercent(summary.recentAccuracy)}%`;
+  els.analyticsMetrics.innerHTML = [
+    metricTile("Accuracy", `${formatPercent(summary.accuracy)}%`, "All count checks"),
+    metricTile("Avg error", formatNumber(summary.avgError), "Absolute count miss"),
+    metricTile("Median speed", formatMs(summary.medianResponse), "Answer response"),
+    metricTile("P90 speed", formatMs(summary.p90Response), "Slower responses"),
+    metricTile("Current streak", summary.currentStreak, "Correct checks"),
+    metricTile("Best streak", summary.bestStreak, "Correct checks"),
+    metricTile("No major miss", summary.noMajorErrorStreak, "Errors under 3"),
+    metricTile("Cards counted", summary.totals?.cards || 0, "Visible cards")
+  ].join("");
+  renderBreakdowns(summary);
+  renderSessions(summary.sessions || []);
+}
+
+function metricTile(label, value, hint) {
+  return `
+    <div class="metric-tile">
+      <span>${label}</span>
+      <strong>${value}</strong>
+      <small>${hint}</small>
+    </div>
+  `;
+}
+
+function renderTrendChart(days) {
+  if (!days.length) {
+    els.trendChart.innerHTML = `<p class="empty-state">No count checks yet.</p>`;
+    return;
+  }
+  els.trendChart.innerHTML = days.slice(-18).map(day => {
+    const height = Math.max(4, Math.round(day.accuracy));
+    return `
+      <div class="trend-bar" title="${day.day}: ${formatPercent(day.accuracy)}% accuracy">
+        <span style="height:${height}%"></span>
+        <small>${day.day.slice(5)}</small>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderBreakdowns(summary) {
+  const sections = [
+    ["Error size", [
+      { label: "Perfect", checks: summary.errorBuckets?.perfect || 0 },
+      { label: "Off by 1", checks: summary.errorBuckets?.one || 0 },
+      { label: "Off by 2", checks: summary.errorBuckets?.two || 0 },
+      { label: "Major", checks: summary.errorBuckets?.major || 0 }
+    ]],
+    ["Likely error drivers", summary.errorDrivers || []],
+    ["Actual deal speed", summary.speedBreakdown || []],
+    ["Shoe depth", summary.depth || []],
+    ["Count pressure", summary.pressure || []],
+    ["Prompt type", summary.promptTypes || []]
+  ];
+  els.breakdownGrid.innerHTML = sections.map(([title, rows]) => `
+    <div class="breakdown-block">
+      <h4>${title}</h4>
+      ${rows.length ? rows.map(row => breakdownRow(row)).join("") : `<p class="empty-state">No data</p>`}
+    </div>
+  `).join("");
+}
+
+function breakdownRow(row) {
+  const value = row.accuracy === undefined ? row.checks : `${formatPercent(row.accuracy)}%`;
+  const bar = row.accuracy === undefined ? Math.min(100, row.checks * 10) : row.accuracy;
+  const detail = row.avgError === undefined ? `${row.checks} checks` : `${row.checks} checks, ${formatNumber(row.avgError)} avg error`;
+  return `
+    <div class="breakdown-row">
+      <div>
+        <span>${row.label}</span>
+        <small>${detail}</small>
+      </div>
+      <strong>${value}</strong>
+      <span class="breakdown-meter"><span style="width:${Math.max(0, Math.min(100, bar))}%"></span></span>
+    </div>
+  `;
+}
+
+function renderSessions(sessions) {
+  if (!sessions.length) {
+    els.recentSessions.innerHTML = `<p class="empty-state">No practice sessions recorded yet.</p>`;
+    return;
+  }
+  els.recentSessions.innerHTML = sessions.map(session => `
+    <div class="session-row">
+      <div>
+        <strong>${formatDateTime(session.started_at)}</strong>
+        <span>${session.hands || 0} hands · ${session.checks || 0} checks · ${session.shoes || 0} shoes</span>
+      </div>
+      <div>
+        <strong>${formatPercent(session.accuracy)}%</strong>
+        <span>${formatNumber(session.avg_error)} avg err · ${formatMs(session.avg_response_ms)}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderEmptyAnalytics(message) {
+  els.masteryScore.textContent = "0";
+  els.masteryLevel.textContent = "No data yet";
+  els.recentAccuracy.textContent = "0%";
+  els.analyticsMetrics.innerHTML = `<p class="empty-state">${message}</p>`;
+  els.trendChart.innerHTML = `<p class="empty-state">${message}</p>`;
+  els.breakdownGrid.innerHTML = "";
+  els.recentSessions.innerHTML = "";
+}
+
+async function resetAnalyticsData() {
+  if (!state.analytics.serverAvailable) return;
+  const confirmed = window.confirm("Delete all recorded analytics data? This cannot be undone.");
+  if (!confirmed) return;
+  try {
+    await apiRequest("/api/analytics", { method: "DELETE" });
+    state.analytics.sessionId = null;
+    state.analytics.currentShoeId = null;
+    await initAnalytics();
+    if (state.shoe) analyticsStartShoe();
+    loadAnalyticsDashboard();
+  } catch (error) {
+    console.warn("Could not reset analytics", error);
+  }
+}
+
+function formatPercent(value) {
+  return formatNumber(value || 0);
+}
+
+function formatNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "0";
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+
+function formatMs(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return "0 ms";
+  if (number >= 1000) return `${(number / 1000).toFixed(1)} s`;
+  return `${Math.round(number)} ms`;
+}
+
+function formatDateTime(value) {
+  if (!value) return "Unknown";
+  return new Date(value.replace(" ", "T")).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function currentSpeedSnapshot() {
+  return {
+    dealerSpeed: state.settings.dealerSpeed,
+    dealDelayMs: state.settings.dealDelayMs,
+    playerThinkDelayMs: state.settings.playerThinkDelayMs,
+    dealerThinkDelayMs: state.settings.dealerThinkDelayMs,
+    countPromptDelayMs: state.settings.countPromptDelayMs
+  };
 }
 
 function togglePause() {

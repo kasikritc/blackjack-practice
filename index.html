@@ -14,7 +14,10 @@
             <p class="eyebrow">Hi-Lo Practice</p>
             <h1>Blackjack Table</h1>
           </div>
-          <button id="settingsButton" class="icon-button" type="button" aria-label="Open settings" title="Settings">⚙</button>
+          <div class="top-actions">
+            <button id="analyticsButton" type="button"><span>Analytics</span></button>
+            <button id="settingsButton" class="icon-button" type="button" aria-label="Open settings" title="Settings">⚙</button>
+          </div>
         </header>
 
         <section class="felt">
@@ -41,9 +44,65 @@
           <button id="pauseButton" type="button"><span>Pause</span></button>
           <button id="manualCheckButton" type="button"><span>Count check</span></button>
         </nav>
+        <div class="tracking-bar" aria-label="Analytics tracking status">
+          <span id="trackingStatus">Tracking starting...</span>
+          <button id="trackingToggleButton" type="button"><span>Tracking On</span></button>
+        </div>
         <p class="shortcut-help">Shortcuts: N/Enter next hand · W new shoe · P/Space pause · C count check · S settings</p>
       </section>
     </main>
+
+    <aside id="analyticsPanel" class="analytics-panel" aria-hidden="true" hidden>
+      <div class="analytics-header">
+        <div>
+          <p class="eyebrow">Counting mastery</p>
+          <h2>Analytics</h2>
+        </div>
+        <button id="closeAnalyticsButton" class="icon-button" type="button" aria-label="Close analytics">×</button>
+      </div>
+
+      <section class="analytics-hero" aria-label="Mastery summary">
+        <div>
+          <span class="metric-label">Mastery score</span>
+          <strong id="masteryScore">0</strong>
+          <span id="masteryLevel">No data yet</span>
+        </div>
+        <div>
+          <span class="metric-label">Recent accuracy</span>
+          <strong id="recentAccuracy">0%</strong>
+          <span>Last 50 checks</span>
+        </div>
+      </section>
+
+      <section id="analyticsMetrics" class="metric-grid" aria-label="Core analytics"></section>
+
+      <section class="analytics-section" aria-label="Progress trend">
+        <div class="section-title">
+          <h3>Progress</h3>
+          <select id="trendRange" aria-label="Trend range">
+            <option value="all">All time</option>
+            <option value="30d">30 days</option>
+            <option value="7d">7 days</option>
+          </select>
+        </div>
+        <div id="trendChart" class="trend-chart"></div>
+      </section>
+
+      <section class="analytics-section" aria-label="Performance breakdowns">
+        <h3>Breakdowns</h3>
+        <div id="breakdownGrid" class="breakdown-grid"></div>
+      </section>
+
+      <section class="analytics-section" aria-label="Recent sessions">
+        <h3>Recent Sessions</h3>
+        <div id="recentSessions" class="session-list"></div>
+      </section>
+
+      <section class="analytics-section data-tools" aria-label="Data controls">
+        <button id="refreshAnalyticsButton" type="button"><span>Refresh</span></button>
+        <button id="resetAnalyticsButton" type="button"><span>Reset data</span></button>
+      </section>
+    </aside>
 
     <dialog id="countDialog" class="modal">
       <form id="countForm" method="dialog" class="modal-card">
@@ -62,7 +121,7 @@
       </form>
     </dialog>
 
-    <aside id="settingsPanel" class="settings-panel" aria-hidden="true">
+    <aside id="settingsPanel" class="settings-panel" aria-hidden="true" hidden>
       <div class="settings-header">
         <div>
           <p class="eyebrow">Table rules</p>

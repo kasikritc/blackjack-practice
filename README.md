@@ -1,6 +1,6 @@
 # Blackjack Practice
 
-Mobile-friendly Hi-Lo blackjack card counting practice app. It runs as a static local web app with no backend and no npm dependencies.
+Mobile-friendly Hi-Lo blackjack card counting practice app with local SQLite analytics. It runs as a one-user local web app served by a small Node server.
 
 ## Run
 
@@ -34,6 +34,10 @@ hostname -I
 - Tooltip explanations for penetration, dealer peek, and DAS.
 - Real pause/resume during an active round.
 - Keyboard shortcuts for desktop/laptop practice.
+- Local SQLite analytics for one-user practice tracking.
+- Default-on tracking per app session with an on/off toggle.
+- Analytics dashboard for mastery score, accuracy, average error, response speed, streaks, card volume, shoe-depth performance, count-pressure performance, prompt-type performance, trends, and recent sessions.
+- Exact per-quiz card tracking so misses can be reviewed by low cards, high cards, neutral cards, and dealer hole-card reveals.
 
 ## Controls
 
@@ -54,4 +58,14 @@ Keyboard shortcuts:
 - `A`: apply settings while the settings panel is open
 - `Esc`: close settings
 
-This version intentionally does not include accounts, real money, bankroll/betting UI, stats tracking, leaderboards, or multiple training modes.
+This version intentionally does not include accounts, real money, bankroll/betting UI, leaderboards, betting spread training, bankroll analysis, deviations, or multiple training modes.
+
+## Analytics Data
+
+Practice analytics are stored locally in `data/blackjack.sqlite`. The `data/` directory is ignored by git.
+
+Tracking starts on by default when the app loads. Turning tracking off preserves earlier data and stops recording new shoes, hands, visible cards, and count-check answers until it is turned back on.
+
+Each submitted count check stores the exact visible-card sequence since the previous quiz. This powers error-driver analysis for low-card, high-card, neutral-card, and dealer-hole-reveal patterns.
+
+Each visible card also stores the speed settings active at the moment it appeared, plus the elapsed time since the previous visible card. This preserves mid-shoe speed changes for later accuracy analysis.

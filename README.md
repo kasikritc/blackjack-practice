@@ -2,6 +2,8 @@
 
 A local web app for practicing Hi-Lo blackjack card counting with automated hands, running-count quizzes, and SQLite practice analytics.
 
+![Blackjack Practice gameplay](./docs/blackjack-gameplay.png)
+
 ## Quick Start
 
 Clone the repo and enter the project:

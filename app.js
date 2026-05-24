@@ -97,6 +97,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 function bindElements() {
   for (const id of [
     "settingsButton", "closeSettingsButton", "settingsPanel", "applySettingsButton",
+    "settingsEyebrow", "applySettingsLabel",
     "analyticsButton", "closeAnalyticsButton", "analyticsPanel", "trackingStatus", "trackingToggleButton",
     "masteryScore", "masteryLevel", "recentAccuracy", "analyticsMetrics", "trendRange",
     "trendChart", "breakdownGrid", "recentSessions", "sessionRangeSelect", "loadMoreSessionsButton", "refreshAnalyticsButton", "resetAnalyticsButton",
@@ -1025,6 +1026,11 @@ function syncSettingsForm() {
 }
 
 function toggleSettings(open) {
+  if (open) {
+    const flash = state.mode === "flash";
+    els.settingsEyebrow.textContent = flash ? "Flash Count" : "Table rules";
+    els.applySettingsLabel.textContent = flash ? "Apply" : "Apply and shuffle";
+  }
   els.settingsPanel.hidden = false;
   els.settingsPanel.classList.toggle("open", open);
   els.settingsPanel.setAttribute("aria-hidden", String(!open));

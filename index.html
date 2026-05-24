@@ -253,13 +253,14 @@
     <aside id="settingsPanel" class="settings-panel" aria-hidden="true" hidden>
       <div class="settings-header">
         <div>
-          <p class="eyebrow">Table rules</p>
+          <p class="eyebrow" id="settingsEyebrow">Table rules</p>
           <h2>Settings</h2>
         </div>
         <button id="closeSettingsButton" class="icon-button" type="button" aria-label="Close settings">×</button>
       </div>
       <p class="settings-hint">Keyboard: A applies settings, Esc closes.</p>
 
+      <div data-settings-for="table">
       <div class="settings-grid">
         <label>Decks
           <select id="numberOfDecks">
@@ -351,8 +352,9 @@
           </select>
         </label>
       </div>
+      </div>
 
-      <h3 class="settings-group-title">Flash Count drill</h3>
+      <div data-settings-for="flash">
       <div class="settings-grid">
         <label>Min cards
           <input id="flashMinCards" type="number" min="1" max="8" value="2" />
@@ -365,8 +367,9 @@
           <span id="flashDurationValue">1500 ms</span>
         </label>
       </div>
+      </div>
 
-      <div class="toggle-grid">
+      <div class="toggle-grid" data-settings-for="table">
         <label><input id="surrenderAllowed" type="checkbox" /> Surrender</label>
         <label><input id="doubleAfterSplit" type="checkbox" checked />
           <span class="label-title">DAS
@@ -376,10 +379,13 @@
         <label><input id="resplitAces" type="checkbox" /> Resplit aces</label>
         <label><input id="hitSplitAces" type="checkbox" /> Hit split aces</label>
         <label><input id="sideBetsEnabled" type="checkbox" /> Side bets</label>
+      </div>
+
+      <div class="toggle-grid" data-settings-for="shared">
         <label><input id="animationsEnabled" type="checkbox" checked /> Animation</label>
       </div>
 
-      <button id="applySettingsButton" class="primary wide" type="button"><span>Apply and shuffle</span></button>
+      <button id="applySettingsButton" class="primary wide" type="button"><span id="applySettingsLabel">Apply and shuffle</span></button>
     </aside>
 
     <script src="./app.js"></script>

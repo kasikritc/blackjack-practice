@@ -1074,6 +1074,9 @@ h2 { font-size: 22px; }
   gap: 10px;
 }
 
+body[data-mode="table"] [data-settings-for="flash"] { display: none; }
+body[data-mode="flash"] [data-settings-for="table"] { display: none; }
+
 .settings-grid label,
 .toggle-grid label {
   display: grid;

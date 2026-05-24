@@ -89,7 +89,8 @@ Keyboard shortcuts:
 - `W`: new shoe
 - `P` or `Space`: pause/resume
 - `C`: count check; continue after count feedback
-- `S`: settings; toggle sign inside the count prompt
+- `D`: toggle sign inside the count prompt (D for "down"/negative, matching how counts are spoken)
+- `S`: settings
 - `A`: apply settings while the settings panel is open
 - `Esc`: close settings
 

@@ -1,6 +1,7 @@
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
+const os = require("node:os");
 const path = require("node:path");
 const { URL } = require("node:url");
 
@@ -154,9 +155,19 @@ function startServer(port) {
     throw error;
   });
   server.listen(port, "0.0.0.0", () => {
-    console.log(`Blackjack Practice running at http://0.0.0.0:${port}`);
+    console.log(`Blackjack Practice server is running at http://localhost:${port}`);
+    for (const address of getLanAddresses()) {
+      console.log(`Network URL: http://${address}:${port}`);
+    }
     console.log(`Analytics database: ${DB_PATH}`);
   });
+}
+
+function getLanAddresses() {
+  return Object.values(os.networkInterfaces())
+    .flat()
+    .filter(address => address && address.family === "IPv4" && !address.internal)
+    .map(address => address.address);
 }
 
 function createHttpServer() {

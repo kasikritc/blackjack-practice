@@ -22,7 +22,7 @@ const defaultSettings = {
   playerThinkDelayMs: 1200,
   dealerThinkDelayMs: 700,
   countPromptDelayMs: 1800,
-  countCheckMode: "random",
+  countCheckMode: "everyRound",
   countCheckCardInterval: 10,
   shuffleImmediately: false,
   sideBetsEnabled: false,
@@ -86,7 +86,7 @@ function bindElements() {
     "trendChart", "breakdownGrid", "recentSessions", "sessionRangeSelect", "loadMoreSessionsButton", "refreshAnalyticsButton", "resetAnalyticsButton",
     "newShoeButton", "nextButton", "pauseButton", "manualCheckButton", "dealerSeat",
     "otherPlayers", "shoe", "discard", "status", "payoutLabel", "ruleLabel",
-    "countDialog", "countForm", "countSignButton", "countInput", "countFeedback", "submitCountButton",
+    "countDialog", "countDialogEyebrow", "countDialogTitle", "countForm", "countSignButton", "countInput", "countFeedback", "submitCountButton",
     "continueButton", "numberOfDecks", "penetrationPercent", "penetrationValue",
     "dealerHitsSoft17", "dealerPeek", "blackjackPayout", "numberOfOtherPlayers",
     "shoeDisplayMode", "dealerSpeed", "dealDelayMs", "dealDelayValue", "playerThinkDelayMs", "playerThinkDelayValue",
@@ -314,6 +314,10 @@ async function runRound() {
 
     moveHandsToDiscard();
     analyticsRecordHand(handOutcome);
+    state.phase = "roundEnd";
+    clearTable();
+    render();
+
     if (state.shoe.cutReached) {
       state.pendingShuffle = true;
       setStatus("Cut card reached. Shuffling after this round.");
@@ -479,6 +483,7 @@ function openCountCheck(source = "manual") {
     els.submitCountButton.hidden = false;
     els.continueButton.hidden = true;
     els.countDialog.dataset.resolve = "pending";
+    applyCountDialogFraming(source);
     state.countPromptResolve = resolve;
     els.countDialog.showModal();
     setTimeout(() => els.countInput.focus(), 50);
@@ -548,8 +553,24 @@ function toggleCountSign() {
   els.countInput.focus();
 }
 
+function applyCountDialogFraming(source) {
+  const betweenRounds = source === "everyRound" || source === "cutCard";
+  els.countDialog.classList.toggle("is-between-rounds", betweenRounds);
+  if (source === "everyRound") {
+    els.countDialogEyebrow.textContent = "Place your bet";
+    els.countDialogTitle.textContent = "What is the running count?";
+  } else if (source === "cutCard") {
+    els.countDialogEyebrow.textContent = "Cut card reached";
+    els.countDialogTitle.textContent = "Final running count?";
+  } else {
+    els.countDialogEyebrow.textContent = "Count check";
+    els.countDialogTitle.textContent = "What is the running count?";
+  }
+}
+
 function closeCountCheck() {
   if (els.countDialog.open) els.countDialog.close();
+  els.countDialog.classList.remove("is-between-rounds");
   state.paused = false;
   els.pauseButton.querySelector("span").textContent = "Pause";
   resumePausedWaits();

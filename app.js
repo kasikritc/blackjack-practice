@@ -157,7 +157,7 @@ function handleKeyboardShortcut(event) {
   const isTyping = isTextEntryTarget(target);
 
   if (els.countDialog.open) {
-    if (key === "s") {
+    if (key === "d") {
       event.preventDefault();
       toggleCountSign();
       return;

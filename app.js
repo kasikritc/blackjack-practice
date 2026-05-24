@@ -253,7 +253,7 @@ function handleKeyboardShortcut(event) {
   if (isTyping) return;
 
   if (state.mode === "flash") {
-    if (key === "d" || key === "enter") {
+    if (key === "n" || key === "enter") {
       event.preventDefault();
       if (!els.flashDealButton.disabled) els.flashDealButton.click();
     }

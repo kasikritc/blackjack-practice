@@ -84,8 +84,7 @@ Flash Count:
 
 Keyboard shortcuts:
 
-- `N` or `Enter`: next hand or manual step (Table Practice)
-- `D` or `Enter`: deal a new flash hand (Flash Count)
+- `N` or `Enter`: next hand or manual step (Table Practice); deal a new flash hand (Flash Count)
 - `W`: new shoe
 - `P` or `Space`: pause/resume
 - `C`: count check; continue after count feedback

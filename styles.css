@@ -483,6 +483,11 @@ h2 { font-size: 22px; }
   backdrop-filter: blur(2px);
 }
 
+.modal.is-between-rounds::backdrop {
+  background: rgba(0,0,0,.5);
+  backdrop-filter: none;
+}
+
 .modal-card {
   background: #12211f;
   color: var(--cream);

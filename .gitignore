@@ -20,3 +20,7 @@ dev.pid
 *.local
 .vscode/*
 !.vscode/extensions.json
+
+# Offline simulator build/output
+sim/build/
+sim/runs/

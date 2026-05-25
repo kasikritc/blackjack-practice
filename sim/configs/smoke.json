@@ -1,0 +1,16 @@
+{
+  "name": "smoke-6d-h17-das-ls",
+  "seed": "smoke-seed",
+  "decks": 6,
+  "samplesPerAction": 200,
+  "dealerHitsSoft17": true,
+  "doubleAfterSplit": true,
+  "surrender": "late",
+  "blackjackPayout": "3:2",
+  "maxSplitHands": 4,
+  "resplitAces": false,
+  "hitSplitAces": false,
+  "doubleRule": "anyTwo",
+  "trueCount": 0,
+  "decksRemaining": 6
+}

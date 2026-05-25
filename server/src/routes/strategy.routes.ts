@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { insert, queryAll, update } from "../db/client.js";
+import type { StrategyChartImportRequest } from "@blackjack/shared";
+import { insert, queryAll, sqlValue, update } from "../db/client.js";
 import {
   defaultStrategyChart,
   defaultStrategyRules,
@@ -51,6 +52,26 @@ strategyRouter.post("/strategy/charts", (req, res) => {
   res.status(201).json({ id: row.id, ...strategyData() });
 });
 
+function createChartSubsets(chartId: number): void {
+  for (const subset of defaultStrategySubsets()) {
+    insert("strategy_subsets", {
+      chart_id: chartId,
+      name: subset.name,
+      criteria_json: JSON.stringify(subset.criteria),
+      is_default: 0
+    });
+  }
+}
+
+function validateChartPayload(chart: unknown): boolean {
+  if (!chart || typeof chart !== "object") return false;
+  const candidate = chart as Record<string, unknown>;
+  return ["hard", "soft", "pair"].every(section => {
+    const value = candidate[section];
+    return Boolean(value && typeof value === "object" && !Array.isArray(value));
+  });
+}
+
 strategyRouter.patch("/strategy/charts/:id", (req, res) => {
   const body = req.body || {};
   update("strategy_charts", Number(req.params.id), {
@@ -60,6 +81,49 @@ strategyRouter.patch("/strategy/charts/:id", (req, res) => {
     updated_at: nowIso()
   });
   res.status(200).json({ ok: true, ...strategyData() });
+});
+
+strategyRouter.post("/strategy/charts/import", (req, res) => {
+  const body = (req.body || {}) as Partial<StrategyChartImportRequest>;
+  if (!body.name || !body.rules || !validateChartPayload(body.chart)) {
+    res.status(400).json({ error: "name, rules, and a valid chart are required" });
+    return;
+  }
+
+  const rulesJson = JSON.stringify(body.rules);
+  let profile = queryAll(
+    `SELECT id FROM strategy_rule_profiles WHERE rules_json = ${sqlValue(rulesJson)} LIMIT 1`
+  )[0];
+  if (!profile) {
+    profile = insert("strategy_rule_profiles", {
+      name: `Generated rules - ${body.name}`,
+      rules_json: rulesJson
+    });
+  }
+
+  const chart = insert("strategy_charts", {
+    rule_profile_id: profile.id,
+    name: body.name,
+    chart_json: JSON.stringify(body.chart)
+  });
+  createChartSubsets(chart.id);
+
+  insert("strategy_chart_imports", {
+    chart_id: chart.id,
+    simulator_run_id: body.source?.simulatorRunId,
+    seed: body.source?.seed,
+    true_count: body.source?.trueCount,
+    artifact_path: body.source?.artifactPath,
+    source_json: body.source ? JSON.stringify(body.source) : undefined
+  });
+
+  res.status(201).json({
+    ok: true,
+    id: chart.id,
+    ruleProfileId: Number(profile.id),
+    chartId: chart.id,
+    ...strategyData()
+  });
 });
 
 strategyRouter.post("/strategy/subsets", (req, res) => {

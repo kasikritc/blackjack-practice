@@ -183,6 +183,17 @@ CREATE TABLE IF NOT EXISTS strategy_subsets (
   is_default INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (chart_id) REFERENCES strategy_charts(id)
 );
+CREATE TABLE IF NOT EXISTS strategy_chart_imports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chart_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  simulator_run_id TEXT,
+  seed TEXT,
+  true_count REAL,
+  artifact_path TEXT,
+  source_json TEXT,
+  FOREIGN KEY (chart_id) REFERENCES strategy_charts(id)
+);
 CREATE TABLE IF NOT EXISTS strategy_attempts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

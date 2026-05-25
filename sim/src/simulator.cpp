@@ -9,9 +9,11 @@
 #include <iostream>
 #include <map>
 #include <numeric>
+#include <omp.h>
 #include <random>
 #include <regex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -19,7 +21,15 @@ namespace blackjack_sim {
 namespace {
 
 using Hand = std::vector<int>;
-using Shoe = std::vector<int>;
+
+// Shoe stored as rank counts (index 0=rank1/Ace, index 9=rank10/face).
+struct Shoe {
+  int counts[10] = {};
+  int total = 0;
+  int decks = 6;
+};
+
+enum class Action : uint8_t { Stand, Hit, Double, Surrender, Split };
 
 struct Rules {
   int decks = 6;
@@ -74,7 +84,7 @@ struct Accumulator {
 };
 
 struct ActionResult {
-  std::string action;
+  Action action = Action::Stand;
   bool legal = true;
   Accumulator acc;
 };
@@ -210,30 +220,38 @@ bool blackjack(const Hand& hand) {
 
 Shoe full_shoe(int decks) {
   Shoe shoe;
-  shoe.reserve(static_cast<size_t>(52 * decks));
-  for (int deck = 0; deck < decks; ++deck) {
-    for (int i = 0; i < 4; ++i) shoe.push_back(1);
-    for (int rank = 2; rank <= 9; ++rank) {
-      for (int i = 0; i < 4; ++i) shoe.push_back(rank);
-    }
-    for (int i = 0; i < 16; ++i) shoe.push_back(10);
+  shoe.decks = decks;
+  for (int rank = 1; rank <= 9; ++rank) {
+    shoe.counts[rank - 1] = 4 * decks;
+    shoe.total += 4 * decks;
   }
+  // rank 10 includes 10, J, Q, K: 16 cards per deck.
+  shoe.counts[9] = 16 * decks;
+  shoe.total += 16 * decks;
   return shoe;
 }
 
 void remove_one(Shoe& shoe, int rank) {
-  auto it = std::find(shoe.begin(), shoe.end(), rank);
-  if (it != shoe.end()) shoe.erase(it);
+  const int idx = (rank == 10 ? 9 : rank - 1);
+  if (shoe.counts[idx] > 0) {
+    --shoe.counts[idx];
+    --shoe.total;
+  }
 }
 
 int draw(Shoe& shoe, std::mt19937_64& rng) {
-  if (shoe.empty()) shoe = full_shoe(6);
-  std::uniform_int_distribution<size_t> dist(0, shoe.size() - 1);
-  const size_t index = dist(rng);
-  const int card = shoe[index];
-  shoe[index] = shoe.back();
-  shoe.pop_back();
-  return card;
+  if (shoe.total == 0) shoe = full_shoe(shoe.decks);
+  std::uniform_int_distribution<int> dist(0, shoe.total - 1);
+  int pick = dist(rng);
+  for (int i = 0; i < 10; ++i) {
+    if (pick < shoe.counts[i]) {
+      --shoe.counts[i];
+      --shoe.total;
+      return (i == 9 ? 10 : i + 1);
+    }
+    pick -= shoe.counts[i];
+  }
+  throw std::runtime_error("shoe count invariant violated");
 }
 
 bool double_allowed(const Rules& rules, const Hand& hand) {
@@ -280,7 +298,7 @@ Outcome settle(const Rules& rules, const Hand& player, Hand dealer, Shoe shoe, s
     out.ev = blackjack_payout(rules) * bet;
     return out;
   }
-  dealer = dealer_final(rules, dealer, std::move(shoe), rng);
+  dealer = dealer_final(rules, dealer, shoe, rng);
   const auto dealer_value_result = value_of(dealer);
   if (dealer_value_result.total > 21 || player_value.total > dealer_value_result.total) out.ev = bet;
   else if (player_value.total < dealer_value_result.total) out.ev = -bet;
@@ -288,29 +306,40 @@ Outcome settle(const Rules& rules, const Hand& player, Hand dealer, Shoe shoe, s
   return out;
 }
 
-std::vector<std::string> legal_actions(const Rules& rules, const Hand& hand, bool can_double, bool can_surrender, bool after_split_aces, int split_hands) {
-  std::vector<std::string> actions{"stand"};
+std::vector<Action> legal_actions(const Rules& rules, const Hand& hand, bool can_double, bool can_surrender, bool after_split_aces, int split_hands) {
+  std::vector<Action> actions{Action::Stand};
   const auto value = value_of(hand);
-  if (value.total < 21 && !after_split_aces) actions.push_back("hit");
-  if (can_double && double_allowed(rules, hand)) actions.push_back("double");
-  if (can_surrender && hand.size() == 2 && rules.surrender != "none") actions.push_back("surrender");
-  if (split_allowed(rules, hand, split_hands)) actions.push_back("split");
+  if (value.total < 21 && !after_split_aces) actions.push_back(Action::Hit);
+  if (can_double && double_allowed(rules, hand)) actions.push_back(Action::Double);
+  if (can_surrender && hand.size() == 2 && rules.surrender != "none") actions.push_back(Action::Surrender);
+  if (split_allowed(rules, hand, split_hands)) actions.push_back(Action::Split);
   return actions;
 }
 
-Outcome play_action(const Config& config, const std::string& action, Hand player, Hand dealer, Shoe shoe, std::mt19937_64& rng, int depth, int split_hands, bool after_split_aces);
+std::string action_name(Action a) {
+  switch (a) {
+    case Action::Stand:     return "stand";
+    case Action::Hit:       return "hit";
+    case Action::Double:    return "double";
+    case Action::Surrender: return "surrender";
+    case Action::Split:     return "split";
+  }
+  return "stand";
+}
+
+Outcome play_action(const Config& config, Action action, Hand player, Hand dealer, Shoe shoe, std::mt19937_64& rng, int depth, int split_hands, bool after_split_aces);
 
 Outcome optimal_ev(const Config& config, Hand player, Hand dealer, Shoe shoe, std::mt19937_64& rng, int depth, int split_hands, bool can_double, bool can_surrender, bool after_split_aces) {
   if (value_of(player).total > 21) return {-1.0, false, true};
-  if (depth >= 8) return settle(config.rules, player, dealer, std::move(shoe), rng, 1.0, false);
+  if (depth >= 8) return settle(config.rules, player, dealer, shoe, rng, 1.0, false);
   const int policy_samples = std::max(6, std::min(32, config.samples_per_action / 8));
   double best = -100.0;
   Outcome best_outcome;
-  for (const auto& action : legal_actions(config.rules, player, can_double, can_surrender, after_split_aces, split_hands)) {
+  for (const Action action : legal_actions(config.rules, player, can_double, can_surrender, after_split_aces, split_hands)) {
     double ev = 0.0;
     Outcome representative;
     for (int i = 0; i < policy_samples; ++i) {
-      auto branch_shoe = shoe;
+      Shoe branch_shoe = shoe;  // trivial struct copy, no heap
       auto branch_rng = rng;
       branch_rng.discard(static_cast<unsigned long long>(i + depth * 17));
       auto outcome = play_action(config, action, player, dealer, branch_shoe, branch_rng, depth + 1, split_hands, after_split_aces);
@@ -327,42 +356,40 @@ Outcome optimal_ev(const Config& config, Hand player, Hand dealer, Shoe shoe, st
   return best_outcome;
 }
 
-Outcome play_action(const Config& config, const std::string& action, Hand player, Hand dealer, Shoe shoe, std::mt19937_64& rng, int depth, int split_hands, bool after_split_aces) {
-  if (action == "surrender") return {-0.5, false, false, true, false, split_hands};
-  if (action == "stand") return settle(config.rules, player, dealer, std::move(shoe), rng, 1.0, blackjack(player));
-  if (action == "double") {
-    player.push_back(draw(shoe, rng));
-    auto outcome = settle(config.rules, player, dealer, std::move(shoe), rng, 2.0, false);
-    outcome.doubled = true;
-    return outcome;
-  }
-  if (action == "hit") {
-    player.push_back(draw(shoe, rng));
-    return optimal_ev(config, player, dealer, std::move(shoe), rng, depth + 1, split_hands, false, false, false);
-  }
-  if (action == "split") {
-    Outcome combined;
-    combined.split_hands = split_hands + 1;
-    combined.split_hands = std::max(combined.split_hands, 2);
-    combined.split_hands = std::min(combined.split_hands, config.rules.max_split_hands);
-    combined.split_hands = std::max(combined.split_hands, split_hands + 1);
-    combined.split_hands = std::max(combined.split_hands, 2);
-    const int rank = player[0];
-    for (int i = 0; i < 2; ++i) {
-      Hand child{rank, draw(shoe, rng)};
-      const bool split_aces = rank == 1;
-      const bool locked_ace = split_aces && !config.rules.hit_split_aces;
-      auto child_outcome = locked_ace
-        ? settle(config.rules, child, dealer, shoe, rng, 1.0, false)
-        : optimal_ev(config, child, dealer, shoe, rng, depth + 1, split_hands + 1, config.rules.double_after_split, false, false);
-      combined.ev += child_outcome.ev;
-      combined.blackjack = combined.blackjack || child_outcome.blackjack;
-      combined.bust = combined.bust || child_outcome.bust;
-      combined.doubled = combined.doubled || child_outcome.doubled;
+Outcome play_action(const Config& config, Action action, Hand player, Hand dealer, Shoe shoe, std::mt19937_64& rng, int depth, int split_hands, bool after_split_aces) {
+  switch (action) {
+    case Action::Surrender:
+      return {-0.5, false, false, true, false, split_hands};
+    case Action::Stand:
+      return settle(config.rules, player, dealer, shoe, rng, 1.0, blackjack(player));
+    case Action::Double: {
+      player.push_back(draw(shoe, rng));
+      auto outcome = settle(config.rules, player, dealer, shoe, rng, 2.0, false);
+      outcome.doubled = true;
+      return outcome;
     }
-    return combined;
+    case Action::Hit:
+      player.push_back(draw(shoe, rng));
+      return optimal_ev(config, player, dealer, shoe, rng, depth + 1, split_hands, false, false, false);
+    case Action::Split: {
+      Outcome combined;
+      combined.split_hands = std::max(2, std::min(config.rules.max_split_hands, split_hands + 1));
+      const int rank = player[0];
+      for (int i = 0; i < 2; ++i) {
+        Hand child{rank, draw(shoe, rng)};
+        const bool locked_ace = (rank == 1) && !config.rules.hit_split_aces;
+        auto child_outcome = locked_ace
+          ? settle(config.rules, child, dealer, shoe, rng, 1.0, false)
+          : optimal_ev(config, child, dealer, shoe, rng, depth + 1, split_hands + 1, config.rules.double_after_split, false, false);
+        combined.ev += child_outcome.ev;
+        combined.blackjack = combined.blackjack || child_outcome.blackjack;
+        combined.bust = combined.bust || child_outcome.bust;
+        combined.doubled = combined.doubled || child_outcome.doubled;
+      }
+      return combined;
+    }
   }
-  return settle(config.rules, player, dealer, std::move(shoe), rng, 1.0, false);
+  return settle(config.rules, player, dealer, shoe, rng, 1.0, false);
 }
 
 void add(Accumulator& acc, const Outcome& outcome) {
@@ -430,17 +457,18 @@ CellResult simulate_cell(const Config& config, const std::string& category, cons
   const bool after_split_aces = false;
   auto actions = legal_actions(config.rules, initial, true, true, after_split_aces, 1);
   if (category != "pair") {
-    actions.erase(std::remove(actions.begin(), actions.end(), "split"), actions.end());
+    actions.erase(std::remove(actions.begin(), actions.end(), Action::Split), actions.end());
   }
-  for (const auto& action : actions) {
+  for (const Action action : actions) {
     ActionResult result{action, true};
+    const std::string action_str = action_name(action);
     for (int sample = 0; sample < config.samples_per_action; ++sample) {
       Shoe shoe = full_shoe(config.rules.decks);
       for (int card : initial) remove_one(shoe, card);
       remove_one(shoe, upcard);
-      auto rng = make_rng(config, category + row_key + dealer_label + action, sample);
+      auto rng = make_rng(config, category + row_key + dealer_label + action_str, sample);
       Hand dealer{upcard, draw(shoe, rng)};
-      auto outcome = play_action(config, action, initial, dealer, std::move(shoe), rng, 0, 1, false);
+      auto outcome = play_action(config, action, initial, dealer, shoe, rng, 0, 1, false);
       add(result.acc, outcome);
     }
     cell.actions.push_back(result);
@@ -448,7 +476,7 @@ CellResult simulate_cell(const Config& config, const std::string& category, cons
   std::sort(cell.actions.begin(), cell.actions.end(), [](const ActionResult& a, const ActionResult& b) {
     return mean(a.acc) > mean(b.acc);
   });
-  cell.best_action = cell.actions.empty() ? "stand" : cell.actions.front().action;
+  cell.best_action = cell.actions.empty() ? "stand" : action_name(cell.actions.front().action);
   if (cell.actions.size() >= 2) cell.winner_margin = mean(cell.actions[0].acc) - mean(cell.actions[1].acc);
   return cell;
 }
@@ -458,7 +486,7 @@ std::string action_json(const ActionResult& action) {
   const double ev = mean(a);
   const double se = standard_error(a);
   std::ostringstream out;
-  out << "{\"action\":\"" << action.action << "\",\"legal\":true,\"samples\":" << a.samples
+  out << "{\"action\":\"" << action_name(action.action) << "\",\"legal\":true,\"samples\":" << a.samples
       << ",\"ev\":" << ev << ",\"standardError\":" << se
       << ",\"confidenceLow\":" << ev - 1.96 * se << ",\"confidenceHigh\":" << ev + 1.96 * se
       << ",\"winRate\":" << rate(a.wins, a) << ",\"lossRate\":" << rate(a.losses, a)
@@ -486,9 +514,10 @@ std::string rules_json(const Rules& r) {
   return out.str();
 }
 
-void write_manifest(const Config& config, const std::filesystem::path& run_dir, const std::string& run_id) {
+void write_manifest(const Config& config, const std::filesystem::path& run_dir, const std::string& run_id, long long elapsed_ms) {
   std::ofstream out(run_dir / "manifest.json");
   out << "{\n  \"id\": \"" << run_id << "\",\n  \"createdAt\": \"" << now_compact() << "\",\n"
+      << "  \"elapsedMs\": " << elapsed_ms << ",\n"
       << "  \"simulatorVersion\": \"0.1.0\",\n  \"config\": {\n"
       << "    \"name\": \"" << config.name << "\",\n    \"seed\": \"" << config.seed << "\",\n"
       << "    \"rules\": " << rules_json(config.rules) << ",\n"
@@ -535,8 +564,9 @@ void write_summary(const Config& config, const std::vector<CellResult>& cells, c
       const double low = ev - 1.96 * se;
       const double high = ev + 1.96 * se;
       const double avg_split = a.samples ? static_cast<double>(a.split_hands) / a.samples : 0.0;
-      csv << cell.category << ',' << cell.row_key << ',' << cell.dealer << ',' << config.true_count << ',' << config.decks_remaining << ',' << cell.best_action << ',' << cell.winner_margin << ',' << action.action << ',' << a.samples << ',' << ev << ',' << se << ',' << low << ',' << high << ',' << rate(a.wins, a) << ',' << rate(a.losses, a) << ',' << rate(a.pushes, a) << ',' << rate(a.blackjacks, a) << ',' << rate(a.busts, a) << ',' << rate(a.surrenders, a) << ',' << rate(a.doubles, a) << ',' << rate(a.splits, a) << ',' << avg_split << "\n";
-      sql << "INSERT INTO action_stats VALUES('" << cell.category << "','" << cell.row_key << "','" << cell.dealer << "'," << config.true_count << ',' << config.decks_remaining << ",'" << cell.best_action << "'," << cell.winner_margin << ",'" << action.action << "'," << a.samples << ',' << ev << ',' << se << ',' << low << ',' << high << ',' << rate(a.wins, a) << ',' << rate(a.losses, a) << ',' << rate(a.pushes, a) << ',' << rate(a.blackjacks, a) << ',' << rate(a.busts, a) << ',' << rate(a.surrenders, a) << ',' << rate(a.doubles, a) << ',' << rate(a.splits, a) << ',' << avg_split << ");\n";
+      const std::string aname = action_name(action.action);
+      csv << cell.category << ',' << cell.row_key << ',' << cell.dealer << ',' << config.true_count << ',' << config.decks_remaining << ',' << cell.best_action << ',' << cell.winner_margin << ',' << aname << ',' << a.samples << ',' << ev << ',' << se << ',' << low << ',' << high << ',' << rate(a.wins, a) << ',' << rate(a.losses, a) << ',' << rate(a.pushes, a) << ',' << rate(a.blackjacks, a) << ',' << rate(a.busts, a) << ',' << rate(a.surrenders, a) << ',' << rate(a.doubles, a) << ',' << rate(a.splits, a) << ',' << avg_split << "\n";
+      sql << "INSERT INTO action_stats VALUES('" << cell.category << "','" << cell.row_key << "','" << cell.dealer << "'," << config.true_count << ',' << config.decks_remaining << ",'" << cell.best_action << "'," << cell.winner_margin << ",'" << aname << "'," << a.samples << ',' << ev << ',' << se << ',' << low << ',' << high << ',' << rate(a.wins, a) << ',' << rate(a.losses, a) << ',' << rate(a.pushes, a) << ',' << rate(a.blackjacks, a) << ',' << rate(a.busts, a) << ',' << rate(a.surrenders, a) << ',' << rate(a.doubles, a) << ',' << rate(a.splits, a) << ',' << avg_split << ");\n";
     }
   }
   sql << "COMMIT;\n";
@@ -560,24 +590,33 @@ void write_summary_json(const Config& config, const std::vector<CellResult>& cel
 
 int run_simulation(const RunOptions& options) {
   try {
+    const auto start_time = std::chrono::steady_clock::now();
     const Config config = parse_config(options.config_path);
     const std::string run_id = slug(config.name) + "-" + now_compact();
     const std::filesystem::path run_dir = std::filesystem::path(options.output_dir) / run_id;
     std::filesystem::create_directories(run_dir);
 
-    std::vector<CellResult> cells;
-    for (const auto& [category, row_key] : rows()) {
-      for (const auto& dealer : dealers()) {
-        cells.push_back(simulate_cell(config, category, row_key, dealer));
-      }
+    const auto row_list = rows();
+    const auto dealer_list = dealers();
+    const int total_cells = static_cast<int>(row_list.size() * dealer_list.size());
+    std::vector<CellResult> cells(total_cells);
+
+    #pragma omp parallel for schedule(dynamic, 4) num_threads(omp_get_max_threads())
+    for (int ci = 0; ci < total_cells; ++ci) {
+      const auto& [category, row_key] = row_list[ci / static_cast<int>(dealer_list.size())];
+      const auto& dealer = dealer_list[ci % dealer_list.size()];
+      cells[ci] = simulate_cell(config, category, row_key, dealer);
     }
 
-    write_manifest(config, run_dir, run_id);
+    const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - start_time).count();
+    write_manifest(config, run_dir, run_id, elapsed_ms);
     write_chart(cells, run_dir);
     write_summary(config, cells, run_dir);
     write_summary_json(config, cells, run_dir, run_id);
     run_sqlite3_script((run_dir / "results.sqlite").string(), (run_dir / "results.sql").string());
     std::cout << run_dir.string() << "\n";
+    std::cerr << "elapsed: " << elapsed_ms / 1000.0 << "s\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << error.what() << "\n";

@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
+find_package(OpenMP REQUIRED)
 
 add_library(sim_cuda OBJECT src/cuda_probe.cu)
 set_target_properties(sim_cuda PROPERTIES CUDA_ARCHITECTURES native)
@@ -18,3 +19,4 @@ add_executable(simulate-strategy
 )
 
 target_include_directories(simulate-strategy PRIVATE src)
+target_link_libraries(simulate-strategy PRIVATE OpenMP::OpenMP_CXX)

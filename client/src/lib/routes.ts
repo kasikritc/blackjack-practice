@@ -1,0 +1,42 @@
+import type { DrillMode } from "@blackjack/shared";
+
+/** Descriptive slugs requested for each drill. Home lives at "/". */
+export const DRILL_PATHS: Record<Exclude<DrillMode, "home">, string> = {
+  table: "/table-practice",
+  flash: "/flash-count",
+  strategy: "/basic-strategy"
+};
+
+export interface DrillMeta {
+  mode: Exclude<DrillMode, "home">;
+  path: string;
+  title: string;
+  tagline: string;
+  description: string;
+}
+
+export const DRILLS: DrillMeta[] = [
+  {
+    mode: "table",
+    path: DRILL_PATHS.table,
+    title: "Table Practice",
+    tagline: "Full table",
+    description: "Play full shoes with other players and keep a running count, quizzed as you go."
+  },
+  {
+    mode: "flash",
+    path: DRILL_PATHS.flash,
+    title: "Flash Count",
+    tagline: "Speed drill",
+    description:
+      "A few cards flash, then hide. Call the Hi-Lo count of the hand instantly. Resets each round."
+  },
+  {
+    mode: "strategy",
+    path: DRILL_PATHS.strategy,
+    title: "Basic Strategy",
+    tagline: "Decision drill",
+    description:
+      "Practice two-card player decisions against a dealer upcard using your own saved charts and house rules."
+  }
+];

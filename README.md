@@ -1,104 +1,90 @@
 # Blackjack Practice
 
-A local web app for practicing Hi-Lo blackjack card counting. It offers two practice modes — a full automated table and a Flash Count speed drill — with running-count quizzes and SQLite practice analytics.
+A local full-stack web app for practicing Hi-Lo blackjack card counting and basic strategy. Three drills — an automated **Table Practice** shoe, a **Flash Count** speed drill, and a **Basic Strategy** decision trainer — each at its own route, backed by a typed REST API and local SQLite analytics.
 
 ![Blackjack Practice gameplay](./docs/blackjack-gameplay.png)
 
-## Quick Start
+## Architecture
 
-Clone the repo and enter the project:
+This is an npm-workspaces monorepo with a clean front-end / back-end split and a shared type package:
+
+```
+blackjack-practice/
+├── shared/   @blackjack/shared — TypeScript types shared by client and server
+├── server/   @blackjack/server — Express + better-sqlite3 REST API
+├── client/   @blackjack/client — React + Vite single-page app (client-side routing)
+└── data/     blackjack.sqlite (created on first run; git-ignored)
+```
+
+- **Backend** — Express (TypeScript) serving a JSON API under `/api`, persisting to SQLite via the `better-sqlite3` driver. Routes are split by resource (`sessions`, `events`, `strategy`, `analytics`); analytics aggregation lives in `server/src/services`. In production the server also serves the built client and falls back to `index.html` so deep links work.
+- **Frontend** — React + Vite. Each drill is a route with its own URL (see below). Game logic lives in framework-agnostic engine modules (`client/src/features/*`) driven by React. Settings persist to `localStorage`.
+- **Shared** — request/response DTOs, domain types (cards, Hi-Lo), strategy and settings shapes, used by both sides for end-to-end type safety.
+
+### Routes
+
+| Drill               | Path              |
+| ------------------- | ----------------- |
+| Home (drill picker) | `/`               |
+| Table Practice      | `/table-practice` |
+| Flash Count         | `/flash-count`    |
+| Basic Strategy      | `/basic-strategy` |
+
+Routing uses the History API, so the browser back/forward buttons work and each drill is bookmarkable and shareable.
+
+## Quick start
+
+Requires Node 18+ and `sqlite3` on `PATH`.
 
 ```bash
 git clone https://github.com/kasikritc/blackjack-practice.git
 cd blackjack-practice
-```
-
-Install the runtime tools:
-
-```bash
-sudo apt install nodejs npm sqlite3
 npm install
-```
-
-Set up the local analytics database:
-
-```bash
-mkdir -p data
-sqlite3 data/blackjack.sqlite ".databases"
-```
-
-The server creates and migrates the SQLite schema automatically when it starts. The database lives at `data/blackjack.sqlite`, and `data/` is ignored by git.
-
-Run the app:
-
-```bash
 npm run dev
 ```
 
-The server binds to `0.0.0.0` on port `5173`. Open it locally at:
+`npm run dev` builds the shared types, then runs the API server (port `5173`) and the Vite dev server (port `5174`) together. Open:
 
 ```text
-http://localhost:5173
+http://localhost:5174
 ```
 
-To run on a different port:
+The Vite dev server proxies `/api` requests to the Express server. The SQLite schema is created and migrated automatically on first run; the database lives at `data/blackjack.sqlite` (git-ignored). Override its location with `BLACKJACK_DB_PATH`.
+
+### Production build
 
 ```bash
-PORT=5174 npm run dev
+npm run build   # builds shared → server → client
+npm start       # serves the built client + API on http://localhost:5173
 ```
 
-## Practice Modes
+## Scripts
 
-On launch you land on a home screen to choose a mode:
+| Command             | Description                               |
+| ------------------- | ----------------------------------------- |
+| `npm run dev`       | Run server + client in watch mode         |
+| `npm run build`     | Build all three workspaces                |
+| `npm start`         | Serve the production build on port `5173` |
+| `npm run typecheck` | Type-check server and client              |
+| `npm run lint`      | Lint the whole repo                       |
+| `npm run format`    | Format with Prettier                      |
 
-- **Table Practice** — the full automated table described below.
-- **Flash Count** — a speed drill. A configurable number of cards (default 2–5, min/max set in Settings) flash briefly, then hide. You call the Hi-Lo count of just that hand using the same count prompt, then the cards reappear with their per-card values as feedback. Each round is independent and resets the count. Flash duration is adjustable in Settings.
+`./start-blackjack-practice.sh` / `./stop-blackjack-practice.sh` (and the `bin-*` wrappers) launch and stop the dev servers in the background.
 
-Flash Count keeps its own analytics — mastery score, accuracy, streaks, trends, and breakdowns by hand size and error size — tracked separately from the table-mode running-count data.
+## Drills
 
-## What It Includes
+- **Table Practice** — real shuffled shoes with configurable deck count and penetration, automated other players and dealer flow, a visible-card-only Hi-Lo running count (the dealer hole card counts only when revealed), and random/interval/end-of-round/manual count quizzes.
+- **Flash Count** — a configurable number of cards (default 2–5) flash briefly then hide; call the Hi-Lo count of just that hand. Each round is independent and resets the count.
+- **Basic Strategy** — two-card decision drills against every dealer upcard, using selectable rule profiles, basic-strategy charts, and focus subsets (pairs only, softs only, dealer 2–6, etc.) seeded by the server.
 
-- Real shuffled shoes with configurable deck count and penetration.
-- Visible-card-only Hi-Lo running count; the dealer hole card is counted only when revealed.
-- Automated other players and dealer flow.
-- Random, interval, end-of-round, and manual running-count quizzes.
-- Mobile-friendly count-check modal with keypad, sign toggle, correction, equation, and card-by-card explanation.
-- Configurable table, rule, speed, shoe display, and quiz settings saved in `localStorage`.
-- Local SQLite analytics for sessions, shoes, hands, visible cards, count checks, response time, accuracy, streaks, and error patterns.
+### Controls & shortcuts
 
-## Controls
+- Table Practice: **Next hand** (`N`/`Enter`), **New shoe** (`W`), **Pause/Resume** (`P`/`Space`), **Count check** (`C`), **Settings** (`S`).
+- Flash Count: **Deal** (`N`/`Enter`).
+- Basic Strategy: **Next prompt** (`N`/`Enter`); actions **Hit** (`A`), **Stand** (`S`), **Double** (`D`), **Split** (`F`), **Surrender** (`R`), **Insurance** (`E`).
+- In the count prompt, `D` toggles the count sign and `Enter` submits / continues.
 
-Table Practice:
+## Analytics
 
-- `New shoe` starts a freshly shuffled shoe.
-- `Next hand` starts the next automated hand, or advances manual-step mode.
-- `Pause` stops an active hand during deal/thinking waits and resumes from the same point.
-- `Count check` manually opens the running-count prompt.
-- `Settings` opens table, rule, speed, shoe display, and running-count quiz configuration.
-- `Home` returns to the mode picker.
+Practice analytics are stored locally in `data/blackjack.sqlite`. Tracking is on by default; a session row is created on the first recorded event. Each drill surfaces its own analytics panel (mastery score, accuracy, streaks, trends, breakdowns). Table and Flash data are stored in separate tables, so resetting one does not affect the other.
 
-Flash Count:
-
-- `Deal` flashes a new hand, then hides it for you to count.
-- `Home` returns to the mode picker.
-
-Keyboard shortcuts:
-
-- `N` or `Enter`: next hand or manual step (Table Practice); deal a new flash hand (Flash Count)
-- `W`: new shoe
-- `P` or `Space`: pause/resume
-- `C`: count check; continue after count feedback
-- `D`: toggle sign inside the count prompt (D for "down"/negative, matching how counts are spoken)
-- `S`: settings
-- `A`: apply settings while the settings panel is open
-- `Esc`: close settings
-
-## Analytics Data
-
-Practice analytics are stored locally in `data/blackjack.sqlite`. Tracking starts on by default when the app loads, but the SQLite session row is created only when the first visible card appears.
-
-Turning tracking off preserves earlier data and stops recording new shoes, hands, visible cards, and count-check answers until it is turned back on. Sessions with visible cards but no count checks are retained for exposure and volume analytics.
-
-Flash Count rounds are stored in their own `flash_rounds` and `flash_round_cards` tables and surfaced through a separate Flash Analytics panel, so resetting one mode's data does not affect the other.
-
-See [`docs/analytics.md`](./docs/analytics.md) for the full SQLite analytics data dictionary. In analytics fields, `number_of_other_players` means automated non-user player seats only; it does not include the practitioner/user seat.
+The REST contract and SQLite schema are unchanged from the original single-file app, so analytics collected before this refactor remain valid. See [`docs/analytics.md`](./docs/analytics.md) for the full data dictionary. In analytics fields, `number_of_other_players` counts automated seats only, not the user's seat.

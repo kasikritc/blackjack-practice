@@ -1,4 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+**/dist/
+
+# Local analytics database (preserved at runtime, never committed)
+data/
+
+# Local dev convenience scripts (not for distribution)
+local/
+
+# Dev server runtime files
 dev.log
 dev.pid
-node_modules/
-data/
+
+# Editor / OS
+.DS_Store
+*.local
+.vscode/*
+!.vscode/extensions.json

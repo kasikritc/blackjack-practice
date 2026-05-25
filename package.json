@@ -1,10 +1,36 @@
 {
   "name": "blackjack-practice",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Mobile-friendly Hi-Lo blackjack card counting practice app.",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
   "scripts": {
-    "dev": "node server.js",
-    "check": "node --check app.js && node --check server.js"
+    "build:shared": "npm run build -w @blackjack/shared",
+    "watch:shared": "npm run dev -w @blackjack/shared",
+    "dev:server": "npm run dev -w @blackjack/server",
+    "dev:client": "npm run dev -w @blackjack/client",
+    "dev": "npm run build:shared && concurrently -k -n shared,server,client -c gray,blue,green \"npm:watch:shared\" \"npm:dev:server\" \"npm:dev:client\"",
+    "build": "npm run build -w @blackjack/shared && npm run build -w @blackjack/server && npm run build -w @blackjack/client",
+    "start": "node server/dist/index.js",
+    "typecheck": "npm run build:shared && npm run typecheck -w @blackjack/server && npm run typecheck -w @blackjack/client",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1"
   }
 }

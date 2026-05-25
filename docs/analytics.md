@@ -22,6 +22,7 @@ Sessions with visible cards but no count checks are valid and retained. They con
 One row per tracked practice session. A session starts on the first visible tracked card, not when the page loads.
 
 Collected fields include:
+
 - `started_at`, `ended_at`
 - `tracking_enabled`
 - `app_version`
@@ -37,6 +38,7 @@ Collected fields include:
 One row per shuffled shoe.
 
 Collected fields include:
+
 - `session_id`
 - `started_at`, `ended_at`
 - `number_of_decks`
@@ -60,6 +62,7 @@ The `number_of_other_players` value is the other-player count at shoe start. If 
 One row per completed hand.
 
 Collected fields include:
+
 - `session_id`, `shoe_id`
 - `hand_number`
 - `duration_ms`
@@ -75,6 +78,7 @@ Collected fields include:
 One row per visible counted card.
 
 Collected fields include:
+
 - `session_id`, `shoe_id`, `hand_number`
 - `visible_order`
 - `rank`, `suit`
@@ -100,6 +104,7 @@ This table preserves mid-shoe setting changes at the card level, including shoe 
 One row per submitted running-count quiz answer.
 
 Collected fields include:
+
 - `session_id`, `shoe_id`, `hand_number`
 - `prompt_source`
 - `correct_running_count`
@@ -125,6 +130,7 @@ The `number_of_other_players` and `shoe_display_mode` values are the active valu
 One row per card that belongs to a submitted count check.
 
 Collected fields include:
+
 - `count_check_id`
 - `session_id`, `shoe_id`, `hand_number`
 - `visible_order`
@@ -143,6 +149,7 @@ This table is used to analyze whether errors correlate with low cards, high card
 ## Dashboard Metrics
 
 The dashboard derives:
+
 - mastery score
 - overall and recent accuracy
 - average absolute error
@@ -165,6 +172,7 @@ The dashboard derives:
 ## Data Not Collected
 
 The app does not collect:
+
 - account identity, email, login data, or names
 - real-money wagers, bankroll, financial data, or payouts
 - location data

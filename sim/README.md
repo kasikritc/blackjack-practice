@@ -24,4 +24,6 @@ The first implementation includes a deterministic CPU engine and a compiled CUDA
 
 - The checked-in smoke config uses a low sample count to validate artifact generation quickly. Increase `samplesPerAction` for meaningful charts.
 - The CPU engine is deterministic for a given seed/config and writes aggregate statistics only.
+- v1 records true-count/decks-remaining buckets in artifacts but does not yet condition the shoe composition from a running-count distribution.
+- v1 uses recursive Monte Carlo rollouts for later decisions, but it does not yet run multi-iteration convergence checks; generated cell records are marked `converged: false`.
 - The CUDA target currently verifies runtime availability and is the extension point for GPU rollout kernels.

@@ -25,6 +25,11 @@
             <strong>Flash Count</strong>
             <span class="mode-card-desc">A few cards flash, then hide. Call the Hi-Lo count of the hand instantly. Resets each round.</span>
           </button>
+          <button id="modeStrategyButton" class="mode-card" type="button">
+            <span class="mode-card-eyebrow">Decision drill</span>
+            <strong>Basic Strategy</strong>
+            <span class="mode-card-desc">Practice two-card player decisions against a dealer upcard using your own saved charts and house rules.</span>
+          </button>
         </div>
       </section>
 
@@ -96,6 +101,51 @@
           <button id="flashDealButton" class="primary" type="button"><span>Deal</span></button>
         </nav>
         <p class="shortcut-help">Shortcuts: N/Enter deal · in the count prompt: D toggles sign, Enter submits.</p>
+      </section>
+
+      <section id="basicStrategyScreen" class="strategy-shell" aria-label="Basic strategy drill" hidden>
+        <header class="top-bar">
+          <div>
+            <p class="eyebrow">Basic Strategy</p>
+            <h1>Basic Strategy Drill</h1>
+          </div>
+          <div class="top-actions">
+            <button id="strategyHomeButton" type="button"><span>Home</span></button>
+            <button id="strategyReviewButton" type="button"><span>Review chart</span></button>
+            <button id="strategyRulesButton" class="icon-button" type="button" aria-label="Open strategy settings" title="Settings">⚙</button>
+          </div>
+        </header>
+
+        <section class="strategy-toolbar strategy-prompt-toolbar" aria-label="Basic strategy prompt controls">
+          <button id="strategyNewHandButton" class="primary" type="button"><span>Next prompt</span></button>
+        </section>
+
+        <section class="strategy-rules-strip" aria-label="Current house rules">
+          <div id="strategyRulesSummary" class="strategy-rules-summary">Loading rules...</div>
+        </section>
+
+        <section class="felt strategy-felt">
+          <div class="strategy-dealer-area">
+            <div id="strategyDealerSeat" class="seat dealer-seat"></div>
+          </div>
+          <div class="strategy-center">
+            <div id="strategyPromptMeta" class="felt-mark strategy-prompt-meta">
+              <span>Blackjack pays <strong>3:2</strong></span>
+              <span>Insurance pays <strong>2:1</strong></span>
+            </div>
+          </div>
+          <div id="strategyPlayerSeat" class="seat strategy-player-seat"></div>
+        </section>
+
+        <nav id="strategyActionControls" class="controls strategy-action-controls" aria-label="Strategy actions">
+          <button type="button" data-strategy-action="hit"><span>Hit</span><kbd>A</kbd></button>
+          <button type="button" data-strategy-action="stand"><span>Stand</span><kbd>S</kbd></button>
+          <button type="button" data-strategy-action="double"><span>Double</span><kbd>D</kbd></button>
+          <button type="button" data-strategy-action="split"><span>Split</span><kbd>F</kbd></button>
+          <button type="button" data-strategy-action="surrender"><span>Surrender</span><kbd>R</kbd></button>
+          <button type="button" data-strategy-action="insurance"><span>Insurance</span><kbd>E</kbd></button>
+        </nav>
+        <p class="shortcut-help">Shortcuts: A hit · S stand · D double · F split · R surrender · E insurance · C review chart · V edit chart · N/Enter next prompt.</p>
       </section>
     </main>
 
@@ -231,6 +281,67 @@
         <button id="flashRefreshAnalyticsButton" type="button"><span>Refresh</span></button>
         <button id="flashResetAnalyticsButton" type="button"><span>Reset data</span></button>
       </section>
+    </aside>
+
+    <aside id="strategyRulesPanel" class="analytics-panel strategy-side-panel" aria-hidden="true" hidden>
+      <div class="analytics-header">
+        <div>
+          <p class="eyebrow">Basic Strategy</p>
+          <h2>Settings</h2>
+        </div>
+        <button id="closeStrategyRulesButton" class="icon-button" type="button" aria-label="Close rules">×</button>
+      </div>
+      <section class="strategy-form-grid" aria-label="Rule profile editor">
+        <label class="strategy-wide-field">Rules <select id="strategyRuleProfileSelect"></select></label>
+        <label>Decks <select id="strategyRuleDecks"><option>1</option><option>2</option><option>4</option><option selected>6</option><option>8</option></select></label>
+        <label>Dealer soft 17 <select id="strategyRuleSoft17"><option value="true">Hit</option><option value="false">Stand</option></select></label>
+        <label hidden>Dealer peek <select id="strategyRulePeek"><option value="true">Enabled</option><option value="false">Disabled</option></select></label>
+        <label hidden>Hole card <select id="strategyRuleHoleCard"><option value="true">Hole card</option><option value="false">No hole card</option></select></label>
+        <label>Blackjack payout <select id="strategyRulePayout"><option>3:2</option><option>6:5</option><option>1:1</option></select></label>
+        <label>Double rule <select id="strategyRuleDouble"><option value="anyTwo">Any two cards</option><option value="hardOnly">Hard totals only</option><option value="nineToEleven">9-11 only</option><option value="tenToEleven">10-11 only</option><option value="none">No double</option></select></label>
+        <label>Surrender <select id="strategyRuleSurrender"><option value="none">None</option><option value="late">Late</option><option value="early">Early</option></select></label>
+        <label>Max split hands <input id="strategyRuleMaxSplitHands" type="number" min="1" max="8" /></label>
+        <label><input id="strategyRuleDAS" type="checkbox" /> Double after split</label>
+        <label><input id="strategyRuleResplitAces" type="checkbox" /> Resplit aces</label>
+        <label><input id="strategyRuleHitSplitAces" type="checkbox" /> Hit split aces</label>
+        <label><input id="strategyRuleOneCardAces" type="checkbox" /> One card after split aces</label>
+        <label><input id="strategyRuleInsurance" type="checkbox" /> Insurance</label>
+        <label><input id="strategyRuleSplitTensByValue" type="checkbox" /> Split any 10-value pair</label>
+      </section>
+      <label class="strategy-custom-json">Custom rule notes JSON
+        <textarea id="strategyRuleCustomJson" rows="5" spellcheck="false"></textarea>
+      </label>
+      <div class="data-tools">
+        <button id="strategyCreateProfileButton" type="button"><span>New profile</span></button>
+        <button id="strategySaveRulesButton" class="primary" type="button"><span>Save rules</span></button>
+      </div>
+    </aside>
+
+    <aside id="strategyPanel" class="analytics-panel strategy-panel" aria-hidden="true" hidden>
+      <div class="analytics-header">
+        <div>
+          <p class="eyebrow">Basic Strategy</p>
+          <h2 id="strategyPanelTitle">Strategy Chart</h2>
+        </div>
+        <button id="closeStrategyPanelButton" class="icon-button" type="button" aria-label="Close strategy chart">×</button>
+      </div>
+      <section class="strategy-chart-tools strategy-review-selects" aria-label="Strategy drill setup">
+        <label>Strategy <select id="strategyChartSelect"></select></label>
+        <label>Drill subset <select id="strategySubsetSelect"></select></label>
+        <button id="strategyEditButton" type="button"><span>Edit chart</span></button>
+      </section>
+      <section class="strategy-chart-tools" aria-label="Strategy chart tools">
+        <label>Chart name <input id="strategyChartName" type="text" /></label>
+        <label>Cell action <select id="strategyCellActionSelect"></select></label>
+        <button id="strategyCloneChartButton" type="button"><span>Clone to current rules</span></button>
+        <button id="strategySaveChartButton" class="primary" type="button"><span>Save chart</span></button>
+      </section>
+      <section class="strategy-chart-tools" aria-label="Subset tools">
+        <label>Subset name <input id="strategySubsetName" type="text" placeholder="Custom subset" /></label>
+        <button id="strategyClearHighlightsButton" type="button"><span>Clear highlights</span></button>
+        <button id="strategySaveSubsetButton" type="button"><span>Save highlighted subset</span></button>
+      </section>
+      <div id="strategyChartEditor" class="strategy-chart-editor" aria-label="Strategy chart editor"></div>
     </aside>
 
     <dialog id="countDialog" class="modal">
@@ -372,8 +483,8 @@
       <div class="toggle-grid" data-settings-for="table">
         <label><input id="surrenderAllowed" type="checkbox" /> Surrender</label>
         <label><input id="doubleAfterSplit" type="checkbox" checked />
-          <span class="label-title">DAS
-            <span class="info-tip opens-left" tabindex="0" aria-label="DAS means double after split. When enabled, a player may double down after splitting a pair.">i</span>
+          <span class="label-title">Double after split
+            <span class="info-tip opens-left" tabindex="0" aria-label="When enabled, a player may double down after splitting a pair.">i</span>
           </span>
         </label>
         <label><input id="resplitAces" type="checkbox" /> Resplit aces</label>

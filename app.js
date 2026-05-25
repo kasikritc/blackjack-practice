@@ -2,6 +2,25 @@ const suits = ["hearts", "diamonds", "clubs", "spades"];
 const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const suitSymbols = { hearts: "♥", diamonds: "♦", clubs: "♣", spades: "♠" };
 const redSuits = new Set(["hearts", "diamonds"]);
+const strategyDealerUpcards = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "A"];
+const strategyActions = ["hit", "stand", "double", "split", "surrender", "insurance"];
+const strategyActionLabels = {
+  hit: "Hit",
+  stand: "Stand",
+  double: "Double",
+  split: "Split",
+  surrender: "Surrender",
+  insurance: "Insurance"
+};
+const strategyActionAbbreviations = {
+  hit: "H",
+  stand: "S",
+  double: "D",
+  split: "P",
+  surrender: "R",
+  insurance: "I"
+};
+const strategyActionKeys = { a: "hit", s: "stand", d: "double", f: "split", r: "surrender", e: "insurance" };
 let cardSerial = 0;
 
 const defaultSettings = {
@@ -45,6 +64,26 @@ const state = {
     sessionRange: "7d",
     sessionLimit: 10,
     sessionPageSize: 10
+  },
+  strategy: {
+    profiles: [],
+    charts: [],
+    subsets: [],
+    selectedProfileId: null,
+    selectedChartId: null,
+    selectedSubsetId: null,
+    playerHand: [],
+    dealerHand: [],
+    handNumber: 0,
+    promptOpenedAt: null,
+    feedback: "Load a strategy chart to start.",
+    feedbackType: "neutral",
+    panelMode: "review",
+    editingCell: null,
+    highlightCriteria: null,
+    currentDecision: null,
+    insuranceResolved: false,
+    serverAvailable: false
   },
   settings: { ...defaultSettings },
   shoe: null,
@@ -91,6 +130,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadSettings();
   bindEvents();
   await initAnalytics();
+  await initStrategyData();
   setMode("home");
 });
 
@@ -111,8 +151,18 @@ function bindElements() {
     "countCheckMode", "countCheckCardInterval", "shuffleImmediately",
     "surrenderAllowed", "doubleAfterSplit", "resplitAces", "hitSplitAces",
     "sideBetsEnabled", "animationsEnabled",
-    "homeScreen", "tableScreen", "flashScreen", "modeTableButton", "modeFlashButton",
+    "homeScreen", "tableScreen", "flashScreen", "basicStrategyScreen", "modeTableButton", "modeFlashButton", "modeStrategyButton",
     "tableHomeButton", "flashHomeButton", "flashAnalyticsButton", "flashSettingsButton",
+    "strategyHomeButton", "strategyRulesButton", "strategyReviewButton", "strategyEditButton", "strategyNewHandButton",
+    "strategyRuleProfileSelect", "strategyChartSelect", "strategySubsetSelect", "strategyRulesSummary",
+    "strategyDealerSeat", "strategyPlayerSeat", "strategyPromptMeta", "strategyActionControls",
+    "strategyRulesPanel", "closeStrategyRulesButton", "strategyRuleDecks", "strategyRuleSoft17",
+    "strategyRulePeek", "strategyRuleHoleCard", "strategyRulePayout", "strategyRuleDouble", "strategyRuleSurrender",
+    "strategyRuleMaxSplitHands", "strategyRuleDAS", "strategyRuleResplitAces", "strategyRuleHitSplitAces",
+    "strategyRuleOneCardAces", "strategyRuleInsurance", "strategyRuleSplitTensByValue", "strategyRuleCustomJson",
+    "strategyCreateProfileButton", "strategySaveRulesButton", "strategyPanel", "strategyPanelTitle", "closeStrategyPanelButton",
+    "strategyChartName", "strategyCellActionSelect", "strategyCloneChartButton", "strategySaveChartButton",
+    "strategySubsetName", "strategyClearHighlightsButton", "strategySaveSubsetButton", "strategyChartEditor",
     "flashStats", "flashCards", "flashStatus", "flashDealButton",
     "flashMinCards", "flashMaxCards", "flashDurationMs", "flashDurationValue",
     "flashAnalyticsPanel", "closeFlashAnalyticsButton", "flashMasteryScore", "flashMasteryLevel",
@@ -208,6 +258,29 @@ function bindEvents() {
     els.flashMaxCards.value = String(state.settings.flashMaxCards);
     saveSettings();
   });
+
+  els.modeStrategyButton.addEventListener("click", () => setMode("strategy"));
+  els.strategyHomeButton.addEventListener("click", () => setMode("home"));
+  els.strategyRulesButton.addEventListener("click", () => toggleStrategyRules(true));
+  els.closeStrategyRulesButton.addEventListener("click", () => toggleStrategyRules(false));
+  els.strategyReviewButton.addEventListener("click", () => openStrategyPanel("review"));
+  els.strategyEditButton.addEventListener("click", () => openStrategyPanel("edit"));
+  els.closeStrategyPanelButton.addEventListener("click", () => toggleStrategyPanel(false));
+  els.strategyNewHandButton.addEventListener("click", dealStrategyPrompt);
+  els.strategyRuleProfileSelect.addEventListener("change", handleStrategyProfileChange);
+  els.strategyChartSelect.addEventListener("change", handleStrategyChartChange);
+  els.strategySubsetSelect.addEventListener("change", handleStrategySubsetChange);
+  els.strategyActionControls.addEventListener("click", event => {
+    const button = event.target.closest("[data-strategy-action]");
+    if (button && !button.disabled) submitStrategyAction(button.dataset.strategyAction);
+  });
+  els.strategyCellActionSelect.addEventListener("change", updateSelectedStrategyCell);
+  els.strategySaveChartButton.addEventListener("click", saveCurrentStrategyChart);
+  els.strategyCloneChartButton.addEventListener("click", cloneCurrentStrategyChart);
+  els.strategyClearHighlightsButton.addEventListener("click", clearStrategyHighlights);
+  els.strategySaveSubsetButton.addEventListener("click", saveStrategySubset);
+  els.strategySaveRulesButton.addEventListener("click", saveStrategyRules);
+  els.strategyCreateProfileButton.addEventListener("click", createStrategyProfile);
 }
 
 function handleKeyboardShortcut(event) {
@@ -251,12 +324,53 @@ function handleKeyboardShortcut(event) {
     return;
   }
 
+  if (els.strategyRulesPanel.classList.contains("open")) {
+    if (key === "escape") {
+      event.preventDefault();
+      toggleStrategyRules(false);
+    }
+    return;
+  }
+
+  if (els.strategyPanel.classList.contains("open")) {
+    if (key === "escape") {
+      event.preventDefault();
+      toggleStrategyPanel(false);
+    }
+    return;
+  }
+
   if (isTyping) return;
 
   if (state.mode === "flash") {
     if (key === "n" || key === "enter") {
       event.preventDefault();
       if (!els.flashDealButton.disabled) els.flashDealButton.click();
+    }
+    return;
+  }
+
+  if (state.mode === "strategy") {
+    if (key === "n" || key === "enter") {
+      event.preventDefault();
+      dealStrategyPrompt();
+      return;
+    }
+    if (key === "c") {
+      event.preventDefault();
+      openStrategyPanel("review");
+      return;
+    }
+    if (key === "v") {
+      event.preventDefault();
+      openStrategyPanel("edit");
+      return;
+    }
+    const action = strategyActionKeys[key];
+    if (action) {
+      event.preventDefault();
+      const button = els.strategyActionControls.querySelector(`[data-strategy-action="${action}"]`);
+      if (button && !button.disabled) submitStrategyAction(action);
     }
     return;
   }
@@ -675,11 +789,14 @@ function setMode(mode) {
   toggleSettings(false);
   toggleAnalytics(false);
   toggleFlashAnalytics(false);
+  toggleStrategyRules(false);
+  toggleStrategyPanel(false);
   if (els.countDialog.open) els.countDialog.close();
   state.paused = false;
   els.homeScreen.hidden = mode !== "home";
   els.tableScreen.hidden = mode !== "table";
   els.flashScreen.hidden = mode !== "flash";
+  els.basicStrategyScreen.hidden = mode !== "strategy";
   document.body.dataset.mode = mode;
   if (mode === "table") {
     if (!state.shoe) startNewShoe();
@@ -689,6 +806,10 @@ function setMode(mode) {
     els.flashCards.innerHTML = "";
     els.flashStatus.textContent = "Press Deal to start a round.";
     refreshFlashStats();
+  } else if (mode === "strategy") {
+    renderStrategySetup();
+    if (!state.strategy.playerHand.length) dealStrategyPrompt();
+    else renderStrategyDrill();
   }
 }
 
@@ -1847,6 +1968,908 @@ function formatDateTime(value) {
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function renderPlayingCard(card, faceUp = card?.visible !== false) {
+  if (!faceUp || !card) return `<div class="card back" aria-label="Face-down card"></div>`;
+  const red = redSuits.has(card.suit) ? " red" : "";
+  const symbol = suitSymbols[card.suit];
+  return `
+    <div class="card${red}" aria-label="${card.rank} of ${card.suit}">
+      <span class="rank corner"><span>${card.rank}</span><span>${symbol}</span></span>
+      <span class="pip">${symbol}</span>
+      <span class="rank bottom-rank corner"><span>${card.rank}</span><span>${symbol}</span></span>
+    </div>
+  `;
+}
+
+async function initStrategyData() {
+  els.strategyCellActionSelect.innerHTML = strategyActions.map(action => `
+    <option value="${action}">${strategyActionLabels[action]}</option>
+  `).join("");
+  try {
+    const data = await apiRequest("/api/strategy");
+    state.strategy.serverAvailable = true;
+    applyStrategyData(data);
+  } catch (error) {
+    console.warn("Strategy data unavailable", error);
+    state.strategy.serverAvailable = false;
+    state.strategy.feedback = "Start the local server to load strategy profiles.";
+  }
+}
+
+function applyStrategyData(data) {
+  state.strategy.profiles = data.profiles || [];
+  state.strategy.charts = data.charts || [];
+  state.strategy.subsets = data.subsets || [];
+  if (!state.strategy.selectedProfileId || !currentStrategyProfile()) {
+    state.strategy.selectedProfileId = state.strategy.profiles[0]?.id || null;
+  }
+  const profileCharts = chartsForCurrentProfile();
+  if (!state.strategy.selectedChartId || !profileCharts.some(chart => chart.id === state.strategy.selectedChartId)) {
+    state.strategy.selectedChartId = profileCharts[0]?.id || state.strategy.charts[0]?.id || null;
+  }
+  const subsets = subsetsForCurrentChart();
+  if (!state.strategy.selectedSubsetId || !subsets.some(subset => subset.id === state.strategy.selectedSubsetId)) {
+    state.strategy.selectedSubsetId = subsets[0]?.id || null;
+  }
+  state.strategy.highlightCriteria = cloneCriteria(currentStrategySubset()?.criteria || defaultStrategyCriteria());
+  renderStrategySetup();
+}
+
+function currentStrategyProfile() {
+  return state.strategy.profiles.find(profile => profile.id === state.strategy.selectedProfileId) || null;
+}
+
+function currentStrategyChart() {
+  return state.strategy.charts.find(chart => chart.id === state.strategy.selectedChartId) || null;
+}
+
+function currentStrategySubset() {
+  return state.strategy.subsets.find(subset => subset.id === state.strategy.selectedSubsetId) || null;
+}
+
+function chartsForCurrentProfile() {
+  return state.strategy.charts.filter(chart => chart.ruleProfileId === state.strategy.selectedProfileId);
+}
+
+function subsetsForCurrentChart() {
+  const chartId = state.strategy.selectedChartId;
+  return state.strategy.subsets.filter(subset => subset.chartId === chartId || subset.isDefault);
+}
+
+function defaultStrategyCriteria() {
+  return { categories: ["hard", "soft", "pair"], dealerUpcards: [...strategyDealerUpcards], rows: [], cells: [] };
+}
+
+function cloneCriteria(criteria) {
+  return {
+    categories: [...(criteria?.categories || ["hard", "soft", "pair"])],
+    dealerUpcards: [...(criteria?.dealerUpcards || strategyDealerUpcards)],
+    rows: [...(criteria?.rows || [])],
+    cells: [...(criteria?.cells || [])]
+  };
+}
+
+function renderStrategySetup() {
+  renderStrategySelects();
+  syncStrategyRulesForm();
+  renderStrategyRulesSummary();
+  renderStrategyDrill();
+  if (els.strategyPanel.classList.contains("open")) renderStrategyChartEditor();
+}
+
+function renderStrategySelects() {
+  els.strategyRuleProfileSelect.innerHTML = state.strategy.profiles.map(profile => `
+    <option value="${profile.id}" ${profile.id === state.strategy.selectedProfileId ? "selected" : ""}>${escapeHtml(profile.name)}</option>
+  `).join("");
+  const charts = chartsForCurrentProfile();
+  els.strategyChartSelect.innerHTML = charts.length
+    ? charts.map(chart => `<option value="${chart.id}" ${chart.id === state.strategy.selectedChartId ? "selected" : ""}>${escapeHtml(chart.name)}</option>`).join("")
+    : `<option value="">No chart for this profile</option>`;
+  const subsets = subsetsForCurrentChart();
+  els.strategySubsetSelect.innerHTML = subsets.length
+    ? subsets.map(subset => `<option value="${subset.id}" ${subset.id === state.strategy.selectedSubsetId ? "selected" : ""}>${escapeHtml(subset.name)}</option>`).join("")
+    : `<option value="">No subsets</option>`;
+  els.strategyNewHandButton.disabled = !currentStrategyChart();
+}
+
+function handleStrategyProfileChange() {
+  state.strategy.selectedProfileId = Number(els.strategyRuleProfileSelect.value) || null;
+  const charts = chartsForCurrentProfile();
+  state.strategy.selectedChartId = charts[0]?.id || null;
+  state.strategy.selectedSubsetId = subsetsForCurrentChart()[0]?.id || null;
+  state.strategy.highlightCriteria = cloneCriteria(currentStrategySubset()?.criteria || defaultStrategyCriteria());
+  state.strategy.playerHand = [];
+  renderStrategySetup();
+  dealStrategyPrompt();
+}
+
+function handleStrategyChartChange() {
+  state.strategy.selectedChartId = Number(els.strategyChartSelect.value) || null;
+  state.strategy.selectedSubsetId = subsetsForCurrentChart()[0]?.id || null;
+  state.strategy.highlightCriteria = cloneCriteria(currentStrategySubset()?.criteria || defaultStrategyCriteria());
+  state.strategy.playerHand = [];
+  renderStrategySetup();
+  dealStrategyPrompt();
+}
+
+function handleStrategySubsetChange() {
+  state.strategy.selectedSubsetId = Number(els.strategySubsetSelect.value) || null;
+  state.strategy.highlightCriteria = cloneCriteria(currentStrategySubset()?.criteria || defaultStrategyCriteria());
+  renderStrategySetup();
+  dealStrategyPrompt();
+}
+
+function renderStrategyRulesSummary() {
+  const profile = currentStrategyProfile();
+  if (!profile) {
+    els.strategyRulesSummary.textContent = "No rule profile loaded.";
+    return;
+  }
+  const rules = normalizedStrategyRules(profile.rules);
+  const chips = [
+    `${rules.decks} decks`,
+    rules.dealerHitsSoft17 ? "Dealer hits soft 17" : "Dealer stands soft 17",
+    `Blackjack pays ${rules.blackjackPayout}`,
+    doubleRuleLabel(rules.doubleRule),
+    rules.doubleAfterSplit ? "Double after split" : "No double after split",
+    surrenderLabel(rules.surrender),
+    `Maximum split hands ${rules.maxSplitHands}`,
+    rules.resplitAces ? "Resplit aces" : "No resplit aces",
+    rules.hitSplitAces ? "Hit split aces" : "No hit split aces",
+    rules.insurance ? "Insurance" : "No insurance"
+  ];
+  els.strategyRulesSummary.innerHTML = chips.map(chip => `<span>${escapeHtml(chip)}</span>`).join("");
+}
+
+function formatStrategyRuleName(rules) {
+  const normalized = normalizedStrategyRules(rules);
+  return [
+    `${normalized.decks} ${normalized.decks === 1 ? "deck" : "decks"}`,
+    normalized.dealerHitsSoft17 ? "dealer hits soft 17" : "dealer stands soft 17",
+    normalized.doubleAfterSplit ? "double after split" : "no double after split",
+    surrenderLabel(normalized.surrender).toLowerCase()
+  ].join(", ");
+}
+
+function findMatchingStrategyProfile(rules) {
+  const signature = strategyRuleSignature(rules);
+  return state.strategy.profiles.find(profile => strategyRuleSignature(profile.rules) === signature) || null;
+}
+
+function strategyRuleSignature(rules) {
+  const normalized = normalizedStrategyRules(rules);
+  return JSON.stringify({
+    decks: normalized.decks,
+    dealerHitsSoft17: normalized.dealerHitsSoft17,
+    blackjackPayout: normalized.blackjackPayout,
+    doubleRule: normalized.doubleRule,
+    doubleAfterSplit: normalized.doubleAfterSplit,
+    surrender: normalized.surrender,
+    maxSplitHands: normalized.maxSplitHands,
+    resplitAces: normalized.resplitAces,
+    hitSplitAces: normalized.hitSplitAces,
+    oneCardSplitAces: normalized.oneCardSplitAces,
+    insurance: normalized.insurance,
+    splitTensByValue: normalized.splitTensByValue,
+    customRules: normalized.customRules
+  });
+}
+
+function doubleRuleLabel(rule) {
+  return ({ anyTwo: "Double any two", hardOnly: "Double hard only", nineToEleven: "Double 9-11", tenToEleven: "Double 10-11", none: "No double" })[rule] || "Double custom";
+}
+
+function surrenderLabel(rule) {
+  return ({ none: "No surrender", late: "Late surrender", early: "Early surrender" })[rule] || "Surrender custom";
+}
+
+function normalizedStrategyRules(rules = {}) {
+  return {
+    decks: Number(rules.decks) || 6,
+    dealerHitsSoft17: rules.dealerHitsSoft17 !== false,
+    dealerPeek: rules.dealerPeek !== false,
+    dealerHoleCard: rules.dealerHoleCard !== false,
+    blackjackPayout: rules.blackjackPayout || "3:2",
+    doubleRule: rules.doubleRule || "anyTwo",
+    doubleAfterSplit: rules.doubleAfterSplit !== false,
+    surrender: rules.surrender || "none",
+    maxSplitHands: Math.max(1, Number(rules.maxSplitHands) || 4),
+    resplitAces: Boolean(rules.resplitAces),
+    hitSplitAces: Boolean(rules.hitSplitAces),
+    oneCardSplitAces: rules.oneCardSplitAces !== false,
+    insurance: rules.insurance !== false,
+    splitTensByValue: Boolean(rules.splitTensByValue),
+    customRules: rules.customRules || {}
+  };
+}
+
+function syncStrategyRulesForm() {
+  const profile = currentStrategyProfile();
+  if (!profile) return;
+  const rules = normalizedStrategyRules(profile.rules);
+  els.strategyRuleDecks.value = String(rules.decks);
+  els.strategyRuleSoft17.value = String(rules.dealerHitsSoft17);
+  els.strategyRulePeek.value = String(rules.dealerPeek);
+  els.strategyRuleHoleCard.value = String(rules.dealerHoleCard);
+  els.strategyRulePayout.value = rules.blackjackPayout;
+  els.strategyRuleDouble.value = rules.doubleRule;
+  els.strategyRuleSurrender.value = rules.surrender;
+  els.strategyRuleMaxSplitHands.value = String(rules.maxSplitHands);
+  els.strategyRuleDAS.checked = rules.doubleAfterSplit;
+  els.strategyRuleResplitAces.checked = rules.resplitAces;
+  els.strategyRuleHitSplitAces.checked = rules.hitSplitAces;
+  els.strategyRuleOneCardAces.checked = rules.oneCardSplitAces;
+  els.strategyRuleInsurance.checked = rules.insurance;
+  els.strategyRuleSplitTensByValue.checked = rules.splitTensByValue;
+  els.strategyRuleCustomJson.value = JSON.stringify(rules.customRules || {}, null, 2);
+}
+
+function collectStrategyRulesForm() {
+  let customRules = {};
+  try {
+    customRules = els.strategyRuleCustomJson.value.trim() ? JSON.parse(els.strategyRuleCustomJson.value) : {};
+  } catch {
+    throw new Error("Custom rule notes must be valid JSON.");
+  }
+  const rules = {
+      decks: Number(els.strategyRuleDecks.value),
+      dealerHitsSoft17: els.strategyRuleSoft17.value === "true",
+      dealerPeek: els.strategyRulePeek.value === "true",
+      dealerHoleCard: els.strategyRuleHoleCard.value === "true",
+      blackjackPayout: els.strategyRulePayout.value,
+      doubleRule: els.strategyRuleDouble.value,
+      doubleAfterSplit: els.strategyRuleDAS.checked,
+      surrender: els.strategyRuleSurrender.value,
+      maxSplitHands: Number(els.strategyRuleMaxSplitHands.value),
+      resplitAces: els.strategyRuleResplitAces.checked,
+      hitSplitAces: els.strategyRuleHitSplitAces.checked,
+      oneCardSplitAces: els.strategyRuleOneCardAces.checked,
+      insurance: els.strategyRuleInsurance.checked,
+      splitTensByValue: els.strategyRuleSplitTensByValue.checked,
+      customRules
+  };
+  return { name: formatStrategyRuleName(rules), rules };
+}
+
+async function saveStrategyRules() {
+  const profile = currentStrategyProfile();
+  if (!profile) return;
+  try {
+    const body = collectStrategyRulesForm();
+    const data = await apiRequest(`/api/strategy/rule-profiles/${profile.id}`, { method: "PATCH", body });
+    applyStrategyData(data);
+    state.strategy.selectedProfileId = profile.id;
+    state.strategy.feedback = "Rules saved.";
+    renderStrategyDrill();
+  } catch (error) {
+    state.strategy.feedback = error.message || "Could not save rules.";
+    renderStrategyDrill();
+  }
+}
+
+async function createStrategyProfile() {
+  try {
+    const currentChart = currentStrategyChart();
+    const body = collectStrategyRulesForm();
+    const existing = findMatchingStrategyProfile(body.rules);
+    if (existing) {
+      state.strategy.selectedProfileId = existing.id;
+      const charts = chartsForCurrentProfile();
+      state.strategy.selectedChartId = charts[0]?.id || state.strategy.selectedChartId;
+      state.strategy.selectedSubsetId = subsetsForCurrentChart()[0]?.id || state.strategy.selectedSubsetId;
+      state.strategy.highlightCriteria = cloneCriteria(currentStrategySubset()?.criteria || defaultStrategyCriteria());
+      renderStrategySetup();
+      dealStrategyPrompt();
+      return;
+    }
+    const data = await apiRequest("/api/strategy/rule-profiles", { method: "POST", body });
+    const profileId = data.id;
+    const chartData = await apiRequest("/api/strategy/charts", {
+      method: "POST",
+      body: {
+        ruleProfileId: profileId,
+        cloneFromChartId: currentChart?.id,
+        name: currentChart ? `${currentChart.name} copy` : "Default strategy"
+      }
+    });
+    applyStrategyData(chartData);
+    state.strategy.selectedProfileId = profileId;
+    state.strategy.selectedChartId = chartData.id;
+    renderStrategySetup();
+    dealStrategyPrompt();
+  } catch (error) {
+    state.strategy.feedback = error.message || "Could not create profile.";
+    renderStrategyDrill();
+  }
+}
+
+function toggleStrategyRules(open) {
+  els.strategyRulesPanel.hidden = false;
+  els.strategyRulesPanel.classList.toggle("open", open);
+  els.strategyRulesPanel.setAttribute("aria-hidden", String(!open));
+  if (open) syncStrategyRulesForm();
+  else setTimeout(() => {
+    if (!els.strategyRulesPanel.classList.contains("open")) els.strategyRulesPanel.hidden = true;
+  }, 180);
+}
+
+function openStrategyPanel(mode) {
+  state.strategy.panelMode = mode;
+  els.strategyPanelTitle.textContent = mode === "edit" ? "Edit Strategy" : "Review Strategy";
+  els.strategyPanel.classList.toggle("is-review", mode === "review");
+  els.strategyPanel.classList.toggle("is-edit", mode === "edit");
+  toggleStrategyPanel(true);
+}
+
+function toggleStrategyPanel(open) {
+  els.strategyPanel.hidden = false;
+  els.strategyPanel.classList.toggle("open", open);
+  els.strategyPanel.setAttribute("aria-hidden", String(!open));
+  if (open) renderStrategyChartEditor();
+  else setTimeout(() => {
+    if (!els.strategyPanel.classList.contains("open")) els.strategyPanel.hidden = true;
+  }, 180);
+}
+
+function renderStrategyChartEditor() {
+  const chart = currentStrategyChart();
+  if (!chart) {
+    els.strategyChartEditor.innerHTML = `<p class="empty-state">No strategy chart loaded.</p>`;
+    return;
+  }
+  els.strategyChartName.value = chart.name || "";
+  const criteria = state.strategy.highlightCriteria || defaultStrategyCriteria();
+  const sections = strategyChartSections();
+  if (state.strategy.panelMode === "review") {
+    renderCompactStrategyReview(chart, criteria, sections);
+    return;
+  }
+  els.strategyChartEditor.classList.remove("is-compact-review");
+  els.strategyChartEditor.innerHTML = sections.map(([category, title, rows]) => `
+    <section class="strategy-chart-section">
+      <div class="section-title">
+        <h3>${title}</h3>
+        <button type="button" class="strategy-row-toggle ${criteria.categories.includes(category) && !criteria.cells.length ? "is-included" : ""}" data-strategy-category="${category}">${criteria.categories.includes(category) ? "Included" : "Include"}</button>
+      </div>
+      <div class="strategy-table-wrap">
+        <table class="strategy-table" data-category="${category}">
+          <thead>
+            <tr>
+              <th>Hand</th>
+              ${strategyDealerUpcards.map(dealer => `<th><button type="button" class="strategy-column-toggle ${criteria.dealerUpcards.includes(dealer) && !criteria.cells.length ? "is-included" : ""}" data-strategy-dealer="${dealer}">${dealer}</button></th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <th><button type="button" class="strategy-row-toggle ${isStrategyRowIncluded(criteria, category, row.key) ? "is-included" : ""}" data-strategy-row="${category}:${row.key}">${row.label}</button></th>
+                ${strategyDealerUpcards.map(dealer => strategyCellHtml(chart.chart, criteria, category, row.key, dealer)).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `).join("");
+  els.strategyChartEditor.onclick = handleStrategyChartClick;
+}
+
+function strategyChartSections() {
+  return [
+    ["hard", "Hard Totals", strategyHardRows()],
+    ["soft", "Soft Totals", strategySoftRows()],
+    ["pair", "Pairs", strategyPairRows()]
+  ];
+}
+
+function renderCompactStrategyReview(chart, criteria, sections) {
+  const hard = sections.find(([category]) => category === "hard");
+  const soft = sections.find(([category]) => category === "soft");
+  const pair = sections.find(([category]) => category === "pair");
+  els.strategyChartEditor.classList.add("is-compact-review");
+  els.strategyChartEditor.innerHTML = `
+    <div class="strategy-review-layout">
+      <div class="strategy-review-main-chart">
+        ${compactStrategyTableHtml(chart.chart, criteria, hard)}
+      </div>
+      <div class="strategy-review-chart-stack">
+        ${compactStrategyTableHtml(chart.chart, criteria, soft)}
+        ${compactStrategyTableHtml(chart.chart, criteria, pair)}
+      </div>
+    </div>
+    <div class="strategy-review-footer">
+      <section>
+        <h3>Actions</h3>
+        <div class="strategy-action-legend" aria-label="Strategy abbreviations">
+          ${strategyActions.map(action => `<span class="strategy-legend-chip action-${action}"><strong>${strategyActionAbbreviations[action]}</strong>${strategyActionLabels[action]}</span>`).join("")}
+        </div>
+      </section>
+      <section>
+        <h3>Practice Include</h3>
+        <p>Crossed-out cells are excluded from the drill. Click rows, columns, sections, or cells to adjust the current subset.</p>
+      </section>
+    </div>
+  `;
+  els.strategyChartEditor.onclick = handleStrategyChartClick;
+}
+
+function compactStrategyTableHtml(chart, criteria, section) {
+  if (!section) return "";
+  const [category, title, rows] = section;
+  return `
+    <div class="strategy-table-wrap compact-strategy-table-wrap">
+      <table class="strategy-table compact-strategy-table" data-category="${category}">
+        <thead>
+          <tr class="strategy-section-row">
+            <th colspan="${strategyDealerUpcards.length + 1}">
+              <button type="button" class="strategy-row-toggle ${criteria.categories.includes(category) && !criteria.cells.length ? "is-included" : ""}" data-strategy-category="${category}">${title}</button>
+            </th>
+          </tr>
+          <tr>
+            <th>Hand</th>
+            ${strategyDealerUpcards.map(dealer => `<th><button type="button" class="strategy-column-toggle ${criteria.dealerUpcards.includes(dealer) && !criteria.cells.length ? "is-included" : ""}" data-strategy-dealer="${dealer}">${dealer}</button></th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <th><button type="button" class="strategy-row-toggle ${isStrategyRowIncluded(criteria, category, row.key) ? "is-included" : ""}" data-strategy-row="${category}:${row.key}">${row.label}</button></th>
+              ${strategyDealerUpcards.map(dealer => strategyCellHtml(chart, criteria, category, row.key, dealer)).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function strategyCellHtml(chart, criteria, category, rowKey, dealer) {
+  const action = getStrategyCellAction(chart, category, rowKey, dealer);
+  const cellId = strategyCellId(category, rowKey, dealer);
+  const included = isStrategyCellIncluded(criteria, category, rowKey, dealer);
+  const includedClass = included ? " is-included" : " is-excluded";
+  const actionClass = action ? ` action-${action}` : "";
+  const label = strategyActionAbbreviations[action] || action || "-";
+  const inclusionLabel = included ? "Included in drill" : "Excluded from drill";
+  return `<td><button type="button" class="strategy-cell${actionClass}${includedClass}" data-strategy-cell="${cellId}" title="${strategyActionLabels[action] || action || "Unset"} - ${inclusionLabel}">${label}</button></td>`;
+}
+
+function handleStrategyChartClick(event) {
+  const cellButton = event.target.closest("[data-strategy-cell]");
+  if (cellButton) {
+    const cellId = cellButton.dataset.strategyCell;
+    const cell = parseStrategyCellId(cellId);
+    state.strategy.editingCell = cellId;
+    els.strategyCellActionSelect.value = getStrategyCellAction(currentStrategyChart().chart, cell.category, cell.rowKey, cell.dealer);
+    toggleStrategyCellHighlight(cell.category, cell.rowKey, cell.dealer);
+    renderStrategyChartEditor();
+    return;
+  }
+  const rowButton = event.target.closest("[data-strategy-row]");
+  if (rowButton) {
+    const [category, rowKey] = rowButton.dataset.strategyRow.split(":");
+    toggleStrategyRowHighlight(category, rowKey);
+    renderStrategyChartEditor();
+    return;
+  }
+  const categoryButton = event.target.closest("[data-strategy-category]");
+  if (categoryButton) {
+    toggleArrayValue(state.strategy.highlightCriteria.categories, categoryButton.dataset.strategyCategory);
+    state.strategy.highlightCriteria.cells = [];
+    renderStrategyChartEditor();
+    return;
+  }
+  const dealerButton = event.target.closest("[data-strategy-dealer]");
+  if (dealerButton) {
+    toggleArrayValue(state.strategy.highlightCriteria.dealerUpcards, dealerButton.dataset.strategyDealer);
+    state.strategy.highlightCriteria.cells = [];
+    renderStrategyChartEditor();
+  }
+}
+
+function updateSelectedStrategyCell() {
+  const chart = currentStrategyChart();
+  const selected = state.strategy.editingCell;
+  if (!chart || !selected) return;
+  const cell = parseStrategyCellId(selected);
+  chart.chart[cell.category] ||= {};
+  chart.chart[cell.category][cell.rowKey] ||= {};
+  chart.chart[cell.category][cell.rowKey][cell.dealer] = els.strategyCellActionSelect.value;
+  renderStrategyChartEditor();
+}
+
+async function saveCurrentStrategyChart() {
+  const chart = currentStrategyChart();
+  if (!chart) return;
+  try {
+    const data = await apiRequest(`/api/strategy/charts/${chart.id}`, {
+      method: "PATCH",
+      body: { name: els.strategyChartName.value.trim() || chart.name, chart: chart.chart, ruleProfileId: chart.ruleProfileId }
+    });
+    applyStrategyData(data);
+    state.strategy.feedback = "Strategy chart saved.";
+    renderStrategyDrill();
+  } catch (error) {
+    state.strategy.feedback = error.message || "Could not save chart.";
+    renderStrategyDrill();
+  }
+}
+
+async function cloneCurrentStrategyChart() {
+  const chart = currentStrategyChart();
+  const profile = currentStrategyProfile();
+  if (!chart || !profile) return;
+  try {
+    const data = await apiRequest("/api/strategy/charts", {
+      method: "POST",
+      body: { ruleProfileId: profile.id, cloneFromChartId: chart.id, name: `${chart.name} copy` }
+    });
+    applyStrategyData(data);
+    state.strategy.selectedChartId = data.id;
+    renderStrategySetup();
+  } catch (error) {
+    state.strategy.feedback = error.message || "Could not clone chart.";
+    renderStrategyDrill();
+  }
+}
+
+function clearStrategyHighlights() {
+  state.strategy.highlightCriteria = defaultStrategyCriteria();
+  renderStrategyChartEditor();
+}
+
+async function saveStrategySubset() {
+  const chart = currentStrategyChart();
+  if (!chart) return;
+  try {
+    const name = els.strategySubsetName.value.trim() || "Custom subset";
+    const data = await apiRequest("/api/strategy/subsets", {
+      method: "POST",
+      body: { chartId: chart.id, name, criteria: state.strategy.highlightCriteria || defaultStrategyCriteria() }
+    });
+    applyStrategyData(data);
+    state.strategy.selectedSubsetId = data.id;
+    renderStrategySetup();
+  } catch (error) {
+    state.strategy.feedback = error.message || "Could not save subset.";
+    renderStrategyDrill();
+  }
+}
+
+function toggleStrategyCellHighlight(category, rowKey, dealer) {
+  const criteria = state.strategy.highlightCriteria ||= defaultStrategyCriteria();
+  const cellId = strategyCellId(category, rowKey, dealer);
+  criteria.cells ||= [];
+  toggleArrayValue(criteria.cells, cellId);
+}
+
+function toggleStrategyRowHighlight(category, rowKey) {
+  const criteria = state.strategy.highlightCriteria ||= defaultStrategyCriteria();
+  criteria.rows ||= [];
+  criteria.cells = [];
+  toggleArrayValue(criteria.rows, `${category}:${rowKey}`);
+}
+
+function toggleArrayValue(values, value) {
+  const index = values.indexOf(value);
+  if (index >= 0) values.splice(index, 1);
+  else values.push(value);
+}
+
+function isStrategyCellIncluded(criteria, category, rowKey, dealer) {
+  if ((criteria.cells || []).length) return criteria.cells.includes(strategyCellId(category, rowKey, dealer));
+  const rowMatch = !(criteria.rows || []).length || criteria.rows.includes(`${category}:${rowKey}`);
+  return (criteria.categories || []).includes(category) && (criteria.dealerUpcards || []).includes(dealer) && rowMatch;
+}
+
+function isStrategyRowIncluded(criteria, category, rowKey) {
+  if ((criteria.cells || []).length) return strategyDealerUpcards.some(dealer => criteria.cells.includes(strategyCellId(category, rowKey, dealer)));
+  return (criteria.categories || []).includes(category) && (!(criteria.rows || []).length || criteria.rows.includes(`${category}:${rowKey}`));
+}
+
+function strategyCellId(category, rowKey, dealer) {
+  return `${category}:${rowKey}:${dealer}`;
+}
+
+function parseStrategyCellId(id) {
+  const [category, rowKey, dealer] = id.split(":");
+  return { category, rowKey, dealer };
+}
+
+function strategyHardRows() {
+  const rows = [];
+  for (let total = 4; total <= 21; total += 1) rows.push({ key: `h${total}`, label: String(total) });
+  return rows;
+}
+
+function strategySoftRows() {
+  const rows = [];
+  for (let total = 13; total <= 21; total += 1) rows.push({ key: `s${total}`, label: `A,${total - 11}` });
+  return rows;
+}
+
+function strategyPairRows() {
+  return ["A", "10", "9", "8", "7", "6", "5", "4", "3", "2"].map(rank => ({ key: `p${rank}`, label: `${rank},${rank}` }));
+}
+
+function dealStrategyPrompt() {
+  const chart = currentStrategyChart();
+  if (!chart) {
+    state.strategy.feedback = state.strategy.serverAvailable ? "Create or select a strategy chart first." : "Strategy database unavailable.";
+    renderStrategyDrill();
+    return;
+  }
+  state.strategy.insuranceResolved = false;
+  const cell = randomStrategyPracticeCell();
+  if (!cell) {
+    state.strategy.feedback = "No legal starting hands match this subset and chart. Adjust the highlighted cells.";
+    renderStrategyDrill();
+    return;
+  }
+  const playerHand = cardsForStrategyRow(cell.category, cell.rowKey);
+  const dealerUpcard = makeStrategyCard(cell.dealer, true);
+  const dealerHole = makeStrategyCard(randomRank(), false);
+  state.strategy.handNumber += 1;
+  state.strategy.playerHand = playerHand;
+  state.strategy.dealerHand = [dealerUpcard, dealerHole];
+  state.strategy.feedback = "";
+  state.strategy.feedbackType = "neutral";
+  state.strategy.promptOpenedAt = Date.now();
+  renderStrategyDrill();
+}
+
+function randomStrategyPracticeCell() {
+  const chart = currentStrategyChart()?.chart;
+  const rules = normalizedStrategyRules(currentStrategyProfile()?.rules);
+  const criteria = state.strategy.highlightCriteria || currentStrategySubset()?.criteria || defaultStrategyCriteria();
+  const cells = [];
+  for (const category of ["pair", "soft", "hard"]) {
+    const rows = category === "pair" ? strategyPairRows() : category === "soft" ? strategySoftRows() : strategyHardRows();
+    for (const row of rows) {
+      if (!isLegalStartingStrategyRow(category, row.key)) continue;
+      for (const dealer of strategyDealerUpcards) {
+        const action = getStrategyCellAction(chart, category, row.key, dealer);
+        if (!action) continue;
+        const sampleHand = sampleCardsForStrategyRow(category, row.key);
+        if (!isStrategyActionLegal(action, rules, sampleHand, dealer)) continue;
+        if (isStrategyCellIncluded(criteria, category, row.key, dealer)) cells.push({ category, rowKey: row.key, dealer });
+      }
+    }
+  }
+  return cells[Math.floor(Math.random() * cells.length)] || null;
+}
+
+function isLegalStartingStrategyRow(category, rowKey) {
+  if (category === "pair") return true;
+  if (category === "soft") return Number(rowKey.slice(1)) < 21;
+  return Boolean(hardStartingCombos(Number(rowKey.slice(1))).length);
+}
+
+function sampleCardsForStrategyRow(category, rowKey) {
+  if (category === "pair") {
+    const rank = rowKey.slice(1);
+    return [{ rank, suit: "spades", visible: true }, { rank, suit: "clubs", visible: true }];
+  }
+  if (category === "soft") {
+    return [{ rank: "A", suit: "spades", visible: true }, { rank: String(Number(rowKey.slice(1)) - 11), suit: "clubs", visible: true }];
+  }
+  const combo = hardStartingCombos(Number(rowKey.slice(1)))[0] || ["10", "6"];
+  return [{ rank: combo[0], suit: "spades", visible: true }, { rank: combo[1], suit: "clubs", visible: true }];
+}
+
+function cardsForStrategyRow(category, rowKey) {
+  if (category === "pair") {
+    const rank = rowKey.slice(1);
+    return [makeStrategyCard(rank, true), makeStrategyCard(rank, true)];
+  }
+  if (category === "soft") {
+    return [makeStrategyCard("A", true), makeStrategyCard(String(Number(rowKey.slice(1)) - 11), true)];
+  }
+  const combos = hardStartingCombos(Number(rowKey.slice(1)));
+  const combo = combos[Math.floor(Math.random() * combos.length)] || ["10", "6"];
+  return [makeStrategyCard(combo[0], true), makeStrategyCard(combo[1], true)];
+}
+
+function hardStartingCombos(total) {
+  const rankPool = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+  const combos = [];
+  for (const first of rankPool) {
+    for (const second of rankPool) {
+      if (first === second) continue;
+      if (rankBlackjackValue(first) + rankBlackjackValue(second) === total) combos.push([first, second]);
+    }
+  }
+  return combos;
+}
+
+function makeStrategyCard(rank, visible) {
+  const suit = suits[Math.floor(Math.random() * suits.length)];
+  cardSerial += 1;
+  return { rank, suit, visible, counted: false, id: `strategy-${rank}-${suit}-${cardSerial}` };
+}
+
+function randomRank() {
+  return ranks[Math.floor(Math.random() * ranks.length)];
+}
+
+function renderStrategyDrill() {
+  renderStrategyRulesSummary();
+  renderStrategySeat(els.strategyDealerSeat, "Dealer", state.strategy.dealerHand);
+  renderStrategySeat(els.strategyPlayerSeat, "You", state.strategy.playerHand);
+  const decision = currentStrategyDecision();
+  const rules = normalizedStrategyRules(currentStrategyProfile()?.rules);
+  state.strategy.currentDecision = decision;
+  renderStrategyTableSignage(rules);
+  for (const button of els.strategyActionControls.querySelectorAll("[data-strategy-action]")) {
+    const action = button.dataset.strategyAction;
+    const legal = decision ? isStrategyActionLegal(action, rules, state.strategy.playerHand, decision.dealer) : false;
+    button.disabled = !legal;
+    button.classList.toggle("is-expected", decision?.expectedAction === action);
+    button.title = legal ? `${strategyActionLabels[action]} (${button.querySelector("kbd")?.textContent || ""})` : `${strategyActionLabels[action]} is not available under these rules`;
+  }
+}
+
+function renderStrategyTableSignage(rules) {
+  const insuranceText = rules.insurance ? "Insurance pays" : "Insurance";
+  const insuranceValue = rules.insurance ? "2:1" : "Not offered";
+  els.strategyPromptMeta.innerHTML = `
+    <span>Blackjack pays <strong>${escapeHtml(rules.blackjackPayout)}</strong></span>
+    <span>${insuranceText} <strong>${insuranceValue}</strong></span>
+  `;
+}
+
+function renderStrategySeat(container, name, hand) {
+  container.innerHTML = `
+    <div class="seat-label"><span>${name}</span></div>
+    <div class="hand">${(hand || []).map(card => renderPlayingCard(card, card.visible)).join("")}</div>
+  `;
+}
+
+function currentStrategyDecision() {
+  const chart = currentStrategyChart()?.chart;
+  const dealer = normalizeDealerRank(state.strategy.dealerHand[0]?.rank);
+  if (!chart || !dealer || !state.strategy.playerHand.length) return null;
+  const classified = classifyStrategyHand(state.strategy.playerHand, normalizedStrategyRules(currentStrategyProfile()?.rules));
+  if (!classified || classified.total > 21) return null;
+  const expectedAction = getStrategyCellAction(chart, classified.category, classified.rowKey, dealer) || "stand";
+  return { ...classified, dealer, expectedAction };
+}
+
+function classifyStrategyHand(hand, rules) {
+  const value = handValue(hand);
+  if (value.total > 21) return { category: "hard", rowKey: "bust", label: "Bust", total: value.total };
+  if (hand.length === 2 && isStrategyPair(hand, rules)) {
+    const rank = normalizePairRank(hand[0].rank);
+    return { category: "pair", rowKey: `p${rank}`, label: `${rank},${rank}`, total: value.total };
+  }
+  if (value.soft) {
+    return { category: "soft", rowKey: `s${value.total}`, label: `Soft ${value.total}`, total: value.total };
+  }
+  return { category: "hard", rowKey: `h${value.total}`, label: `Hard ${value.total}`, total: value.total };
+}
+
+function getStrategyCellAction(chart, category, rowKey, dealer) {
+  return chart?.[category]?.[rowKey]?.[dealer] || null;
+}
+
+function submitStrategyAction(action) {
+  const decision = currentStrategyDecision();
+  if (!decision) return;
+  const correct = action === decision.expectedAction;
+  recordStrategyAttempt(action, decision, correct);
+  if (!correct) {
+    state.strategy.feedback = "Incorrect. Try again.";
+    state.strategy.feedbackType = "incorrect";
+    renderStrategyDrill();
+    return;
+  }
+  applyCorrectStrategyAction(action, decision);
+}
+
+function applyCorrectStrategyAction(action, decision) {
+  if (action === "hit") {
+    state.strategy.playerHand.push(makeStrategyCard(randomRank(), true));
+    const value = handValue(state.strategy.playerHand);
+    if (value.total > 21) {
+      state.strategy.feedback = "Correct. Bust.";
+      state.strategy.feedbackType = "correct";
+      renderStrategyDrill();
+      setTimeout(dealStrategyPrompt, 650);
+      return;
+    }
+    if (value.total === 21) {
+      state.strategy.feedback = "Correct. 21.";
+      state.strategy.feedbackType = "correct";
+      renderStrategyDrill();
+      setTimeout(dealStrategyPrompt, 650);
+      return;
+    }
+    state.strategy.feedback = "";
+    state.strategy.feedbackType = "correct";
+    state.strategy.promptOpenedAt = Date.now();
+    renderStrategyDrill();
+    return;
+  }
+  if (action === "double") state.strategy.playerHand.push(makeStrategyCard(randomRank(), true));
+  state.strategy.feedback = `Correct: ${strategyActionLabels[action]}.`;
+  state.strategy.feedbackType = "correct";
+  renderStrategyDrill();
+  setTimeout(dealStrategyPrompt, 650);
+}
+
+function recordStrategyAttempt(action, decision, correct) {
+  if (!state.strategy.serverAvailable) return;
+  apiRequest("/api/events/strategy-attempt", {
+    method: "POST",
+    body: {
+      ruleProfileId: state.strategy.selectedProfileId,
+      chartId: state.strategy.selectedChartId,
+      subsetId: state.strategy.selectedSubsetId,
+      handNumber: state.strategy.handNumber,
+      category: decision.category,
+      rowKey: decision.rowKey,
+      dealerUpcard: decision.dealer,
+      playerCards: state.strategy.playerHand.map(card => ({ rank: card.rank, suit: card.suit })),
+      action,
+      expectedAction: decision.expectedAction,
+      correct,
+      responseTimeMs: Date.now() - (state.strategy.promptOpenedAt || Date.now())
+    }
+  }).catch(error => console.warn("Could not record strategy attempt", error));
+}
+
+function isStrategyActionLegal(action, rules, hand, dealer) {
+  const value = handValue(hand);
+  if (value.total > 21) return false;
+  if (action === "hit") return value.total < 21;
+  if (action === "stand") return value.total <= 21;
+  if (action === "surrender") return hand.length === 2 && rules.surrender !== "none";
+  if (action === "insurance") return dealer === "A" && rules.insurance && !state.strategy.insuranceResolved;
+  if (action === "split") return hand.length === 2 && rules.maxSplitHands > 1 && isStrategyPair(hand, rules);
+  if (action === "double") return hand.length === 2 && strategyDoubleAllowed(rules, hand);
+  return false;
+}
+
+function strategyDoubleAllowed(rules, hand) {
+  if (rules.doubleRule === "none") return false;
+  const value = handValue(hand);
+  if (rules.doubleRule === "anyTwo") return true;
+  if (rules.doubleRule === "hardOnly") return !value.soft;
+  if (rules.doubleRule === "nineToEleven") return [9, 10, 11].includes(value.total);
+  if (rules.doubleRule === "tenToEleven") return [10, 11].includes(value.total);
+  return true;
+}
+
+function isStrategyPair(hand, rules) {
+  if (hand.length !== 2) return false;
+  const first = normalizePairRank(hand[0].rank);
+  const second = normalizePairRank(hand[1].rank);
+  if (rules.splitTensByValue && first === "10" && second === "10") return true;
+  return hand[0].rank === hand[1].rank;
+}
+
+function normalizePairRank(rank) {
+  return ["10", "J", "Q", "K"].includes(rank) ? "10" : rank;
+}
+
+function normalizeDealerRank(rank) {
+  return ["10", "J", "Q", "K"].includes(rank) ? "10" : rank;
+}
+
+function rankBlackjackValue(rank) {
+  if (rank === "A") return 11;
+  if (["10", "J", "Q", "K"].includes(rank)) return 10;
+  return Number(rank);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function currentSpeedSnapshot() {

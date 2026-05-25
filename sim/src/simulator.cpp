@@ -549,7 +549,7 @@ void write_summary_json(const Config& config, const std::vector<CellResult>& cel
   for (const auto& cell : cells) {
     out << (first_cell ? "" : ",");
     first_cell = false;
-    out << "{\"category\":\"" << cell.category << "\",\"rowKey\":\"" << cell.row_key << "\",\"dealerUpcard\":\"" << cell.dealer << "\",\"trueCount\":" << config.true_count << ",\"decksRemaining\":" << config.decks_remaining << ",\"bestAction\":\"" << cell.best_action << "\",\"winnerMargin\":" << cell.winner_margin << ",\"samples\":" << config.samples_per_action << ",\"converged\":true,\"policyIteration\":1,\"actions\":[";
+    out << "{\"category\":\"" << cell.category << "\",\"rowKey\":\"" << cell.row_key << "\",\"dealerUpcard\":\"" << cell.dealer << "\",\"trueCount\":" << config.true_count << ",\"decksRemaining\":" << config.decks_remaining << ",\"bestAction\":\"" << cell.best_action << "\",\"winnerMargin\":" << cell.winner_margin << ",\"samples\":" << config.samples_per_action << ",\"converged\":false,\"policyIteration\":1,\"actions\":[";
     for (size_t i = 0; i < cell.actions.size(); ++i) out << (i ? "," : "") << action_json(cell.actions[i]);
     out << "]}";
   }

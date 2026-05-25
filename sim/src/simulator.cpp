@@ -31,6 +31,8 @@ struct Shoe {
 
 enum class Action : uint8_t { Stand, Hit, Double, Surrender, Split };
 
+constexpr const char* kSimulatorVersion = "0.1.1";
+
 struct Rules {
   int decks = 6;
   bool dealer_hits_soft_17 = true;
@@ -518,7 +520,7 @@ void write_manifest(const Config& config, const std::filesystem::path& run_dir, 
   std::ofstream out(run_dir / "manifest.json");
   out << "{\n  \"id\": \"" << run_id << "\",\n  \"createdAt\": \"" << now_compact() << "\",\n"
       << "  \"elapsedMs\": " << elapsed_ms << ",\n"
-      << "  \"simulatorVersion\": \"0.1.0\",\n  \"config\": {\n"
+      << "  \"simulatorVersion\": \"" << kSimulatorVersion << "\",\n  \"config\": {\n"
       << "    \"name\": \"" << config.name << "\",\n    \"seed\": \"" << config.seed << "\",\n"
       << "    \"rules\": " << rules_json(config.rules) << ",\n"
       << "    \"samplesPerAction\": " << config.samples_per_action << ",\n"
@@ -574,7 +576,7 @@ void write_summary(const Config& config, const std::vector<CellResult>& cells, c
 
 void write_summary_json(const Config& config, const std::vector<CellResult>& cells, const std::filesystem::path& run_dir, const std::string& run_id) {
   std::ofstream out(run_dir / "simulation-summary.json");
-  out << "{\"manifest\":{\"id\":\"" << run_id << "\",\"createdAt\":\"" << now_compact() << "\",\"simulatorVersion\":\"0.1.0\",\"config\":{\"name\":\"" << config.name << "\",\"seed\":\"" << config.seed << "\",\"rules\":" << rules_json(config.rules) << ",\"samplesPerAction\":" << config.samples_per_action << ",\"trueCountBuckets\":[" << config.true_count << "],\"decksRemainingBuckets\":[" << config.decks_remaining << "],\"maxPolicyIterations\":" << config.max_policy_iterations << ",\"convergenceEpsilon\":" << config.convergence_epsilon << "}},\"cells\":[";
+  out << "{\"manifest\":{\"id\":\"" << run_id << "\",\"createdAt\":\"" << now_compact() << "\",\"simulatorVersion\":\"" << kSimulatorVersion << "\",\"config\":{\"name\":\"" << config.name << "\",\"seed\":\"" << config.seed << "\",\"rules\":" << rules_json(config.rules) << ",\"samplesPerAction\":" << config.samples_per_action << ",\"trueCountBuckets\":[" << config.true_count << "],\"decksRemainingBuckets\":[" << config.decks_remaining << "],\"maxPolicyIterations\":" << config.max_policy_iterations << ",\"convergenceEpsilon\":" << config.convergence_epsilon << "}},\"cells\":[";
   bool first_cell = true;
   for (const auto& cell : cells) {
     out << (first_cell ? "" : ",");

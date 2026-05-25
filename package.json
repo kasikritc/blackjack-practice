@@ -20,7 +20,11 @@
     "typecheck": "npm run build:shared && npm run typecheck -w @blackjack/server && npm run typecheck -w @blackjack/client",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "sim:configure": "cmake -S sim -B sim/build -DCMAKE_BUILD_TYPE=Release",
+    "sim:build": "cmake --build sim/build -j",
+    "sim:devices": "sim/build/simulate-strategy devices",
+    "sim:smoke": "sim/build/simulate-strategy run --config sim/configs/smoke.json --output /tmp/blackjack-sim-runs"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

@@ -1,8 +1,8 @@
 {
-  "name": "smoke-6d-h17-das-ls",
+  "name": "smoke-1k-6d-h17-das-ls",
   "seed": "42",
   "decks": 6,
-  "samplesPerAction": 20,
+  "samplesPerAction": 1000,
   "dealerHitsSoft17": true,
   "doubleAfterSplit": true,
   "surrender": "late",

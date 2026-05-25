@@ -1,6 +1,6 @@
 # Blackjack Practice
 
-A local web app for practicing Hi-Lo blackjack card counting with automated hands, running-count quizzes, and SQLite practice analytics.
+A local web app for practicing Hi-Lo blackjack card counting. It offers two practice modes — a full automated table and a Flash Count speed drill — with running-count quizzes and SQLite practice analytics.
 
 ![Blackjack Practice gameplay](./docs/blackjack-gameplay.png)
 
@@ -47,6 +47,15 @@ To run on a different port:
 PORT=5174 npm run dev
 ```
 
+## Practice Modes
+
+On launch you land on a home screen to choose a mode:
+
+- **Table Practice** — the full automated table described below.
+- **Flash Count** — a speed drill. A configurable number of cards (default 2–5, min/max set in Settings) flash briefly, then hide. You call the Hi-Lo count of just that hand using the same count prompt, then the cards reappear with their per-card values as feedback. Each round is independent and resets the count. Flash duration is adjustable in Settings.
+
+Flash Count keeps its own analytics — mastery score, accuracy, streaks, trends, and breakdowns by hand size and error size — tracked separately from the table-mode running-count data.
+
 ## What It Includes
 
 - Real shuffled shoes with configurable deck count and penetration.
@@ -59,15 +68,23 @@ PORT=5174 npm run dev
 
 ## Controls
 
+Table Practice:
+
 - `New shoe` starts a freshly shuffled shoe.
 - `Next hand` starts the next automated hand, or advances manual-step mode.
 - `Pause` stops an active hand during deal/thinking waits and resumes from the same point.
 - `Count check` manually opens the running-count prompt.
 - `Settings` opens table, rule, speed, shoe display, and running-count quiz configuration.
+- `Home` returns to the mode picker.
+
+Flash Count:
+
+- `Deal` flashes a new hand, then hides it for you to count.
+- `Home` returns to the mode picker.
 
 Keyboard shortcuts:
 
-- `N` or `Enter`: next hand or manual step
+- `N` or `Enter`: next hand or manual step (Table Practice); deal a new flash hand (Flash Count)
 - `W`: new shoe
 - `P` or `Space`: pause/resume
 - `C`: count check; continue after count feedback
@@ -81,5 +98,7 @@ Keyboard shortcuts:
 Practice analytics are stored locally in `data/blackjack.sqlite`. Tracking starts on by default when the app loads, but the SQLite session row is created only when the first visible card appears.
 
 Turning tracking off preserves earlier data and stops recording new shoes, hands, visible cards, and count-check answers until it is turned back on. Sessions with visible cards but no count checks are retained for exposure and volume analytics.
+
+Flash Count rounds are stored in their own `flash_rounds` and `flash_round_cards` tables and surfaced through a separate Flash Analytics panel, so resetting one mode's data does not affect the other.
 
 See [`docs/analytics.md`](./docs/analytics.md) for the full SQLite analytics data dictionary. In analytics fields, `number_of_other_players` means automated non-user player seats only; it does not include the practitioner/user seat.

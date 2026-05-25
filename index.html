@@ -8,13 +8,34 @@
   </head>
   <body>
     <main id="app" class="app">
-      <section class="table-shell" aria-label="Blackjack table">
+      <section id="homeScreen" class="home-screen" aria-label="Choose a practice mode">
+        <header class="home-header">
+          <p class="eyebrow">Hi-Lo Practice</p>
+          <h1>Blackjack Counting Trainer</h1>
+          <p class="home-subtitle">Pick how you want to practice today.</p>
+        </header>
+        <div class="mode-grid">
+          <button id="modeTableButton" class="mode-card" type="button">
+            <span class="mode-card-eyebrow">Full table</span>
+            <strong>Table Practice</strong>
+            <span class="mode-card-desc">Play full shoes with other players and keep a running count, quizzed as you go.</span>
+          </button>
+          <button id="modeFlashButton" class="mode-card" type="button">
+            <span class="mode-card-eyebrow">Speed drill</span>
+            <strong>Flash Count</strong>
+            <span class="mode-card-desc">A few cards flash, then hide. Call the Hi-Lo count of the hand instantly. Resets each round.</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="tableScreen" class="table-shell" aria-label="Blackjack table" hidden>
         <header class="top-bar">
           <div>
             <p class="eyebrow">Hi-Lo Practice</p>
             <h1>Blackjack Table</h1>
           </div>
           <div class="top-actions">
+            <button id="tableHomeButton" type="button"><span>Home</span></button>
             <button id="analyticsButton" type="button"><span>Analytics</span></button>
             <button id="settingsButton" class="icon-button" type="button" aria-label="Open settings" title="Settings">⚙</button>
           </div>
@@ -49,6 +70,32 @@
           <button id="trackingToggleButton" type="button"><span>Tracking On</span></button>
         </div>
         <p class="shortcut-help">Shortcuts: N/Enter next hand · W new shoe · P/Space pause · C count check · S settings</p>
+      </section>
+
+      <section id="flashScreen" class="flash-shell" aria-label="Flash count drill" hidden>
+        <header class="top-bar">
+          <div>
+            <p class="eyebrow">Flash Count</p>
+            <h1>Flash Count</h1>
+          </div>
+          <div class="top-actions">
+            <button id="flashHomeButton" type="button"><span>Home</span></button>
+            <button id="flashAnalyticsButton" type="button"><span>Analytics</span></button>
+            <button id="flashSettingsButton" class="icon-button" type="button" aria-label="Open settings" title="Settings">⚙</button>
+          </div>
+        </header>
+
+        <div id="flashStats" class="flash-stats" aria-label="Flash count stats"></div>
+
+        <section class="flash-stage">
+          <div id="flashCards" class="flash-cards" aria-live="polite"></div>
+          <div id="flashStatus" class="status-pill">Press Deal to start a round.</div>
+        </section>
+
+        <nav class="controls flash-controls" aria-label="Flash controls">
+          <button id="flashDealButton" class="primary" type="button"><span>Deal</span></button>
+        </nav>
+        <p class="shortcut-help">Shortcuts: N/Enter deal · in the count prompt: D toggles sign, Enter submits.</p>
       </section>
     </main>
 
@@ -119,6 +166,73 @@
       </section>
     </aside>
 
+    <aside id="flashAnalyticsPanel" class="analytics-panel" aria-hidden="true" hidden>
+      <div class="analytics-header">
+        <div>
+          <p class="eyebrow">Flash counting</p>
+          <h2>Flash Analytics</h2>
+        </div>
+        <button id="closeFlashAnalyticsButton" class="icon-button" type="button" aria-label="Close analytics">×</button>
+      </div>
+
+      <section class="analytics-hero" aria-label="Flash mastery summary">
+        <div>
+          <span class="metric-label">Mastery score</span>
+          <strong id="flashMasteryScore">0</strong>
+          <span id="flashMasteryLevel">No data yet</span>
+        </div>
+        <div>
+          <span class="metric-label">Recent accuracy</span>
+          <strong id="flashRecentAccuracy">0%</strong>
+          <span>Last 50 rounds</span>
+        </div>
+      </section>
+
+      <section id="flashAnalyticsMetrics" class="analytics-metrics" aria-label="Flash core analytics"></section>
+
+      <section class="analytics-section" aria-label="Flash progress trend">
+        <div class="section-title">
+          <h3>Progress</h3>
+          <select id="flashTrendRange" aria-label="Trend range">
+            <option value="all">All time</option>
+            <option value="30d">30 days</option>
+            <option value="7d">7 days</option>
+          </select>
+        </div>
+        <div id="flashTrendChart" class="trend-chart"></div>
+      </section>
+
+      <section class="analytics-section" aria-label="Flash breakdowns">
+        <h3>Breakdowns</h3>
+        <div id="flashBreakdownGrid" class="breakdown-grid"></div>
+      </section>
+
+      <section class="analytics-section" aria-label="Flash recent sessions">
+        <div class="session-section-header">
+          <h3>Recent Sessions</h3>
+          <label class="session-range">
+            <span class="visually-hidden">Date range</span>
+            <select id="flashSessionRangeSelect">
+              <option value="7d" selected>Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="all">All time</option>
+            </select>
+          </label>
+        </div>
+        <div class="session-list-scroll">
+          <div id="flashRecentSessions" class="session-list"></div>
+          <button id="flashLoadMoreSessionsButton" type="button" class="load-more-button" hidden>
+            <span>Show more</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="analytics-section data-tools" aria-label="Flash data controls">
+        <button id="flashRefreshAnalyticsButton" type="button"><span>Refresh</span></button>
+        <button id="flashResetAnalyticsButton" type="button"><span>Reset data</span></button>
+      </section>
+    </aside>
+
     <dialog id="countDialog" class="modal">
       <form id="countForm" method="dialog" class="modal-card">
         <p class="eyebrow" id="countDialogEyebrow">Count check</p>
@@ -139,13 +253,14 @@
     <aside id="settingsPanel" class="settings-panel" aria-hidden="true" hidden>
       <div class="settings-header">
         <div>
-          <p class="eyebrow">Table rules</p>
+          <p class="eyebrow" id="settingsEyebrow">Table rules</p>
           <h2>Settings</h2>
         </div>
         <button id="closeSettingsButton" class="icon-button" type="button" aria-label="Close settings">×</button>
       </div>
       <p class="settings-hint">Keyboard: A applies settings, Esc closes.</p>
 
+      <div data-settings-for="table">
       <div class="settings-grid">
         <label>Decks
           <select id="numberOfDecks">
@@ -237,8 +352,24 @@
           </select>
         </label>
       </div>
+      </div>
 
-      <div class="toggle-grid">
+      <div data-settings-for="flash">
+      <div class="settings-grid">
+        <label>Min cards
+          <input id="flashMinCards" type="number" min="1" max="8" value="2" />
+        </label>
+        <label>Max cards
+          <input id="flashMaxCards" type="number" min="1" max="8" value="5" />
+        </label>
+        <label>Flash duration
+          <input id="flashDurationMs" type="range" min="300" max="4000" step="100" value="1500" />
+          <span id="flashDurationValue">1500 ms</span>
+        </label>
+      </div>
+      </div>
+
+      <div class="toggle-grid" data-settings-for="table">
         <label><input id="surrenderAllowed" type="checkbox" /> Surrender</label>
         <label><input id="doubleAfterSplit" type="checkbox" checked />
           <span class="label-title">DAS
@@ -248,10 +379,13 @@
         <label><input id="resplitAces" type="checkbox" /> Resplit aces</label>
         <label><input id="hitSplitAces" type="checkbox" /> Hit split aces</label>
         <label><input id="sideBetsEnabled" type="checkbox" /> Side bets</label>
+      </div>
+
+      <div class="toggle-grid" data-settings-for="shared">
         <label><input id="animationsEnabled" type="checkbox" checked /> Animation</label>
       </div>
 
-      <button id="applySettingsButton" class="primary wide" type="button"><span>Apply and shuffle</span></button>
+      <button id="applySettingsButton" class="primary wide" type="button"><span id="applySettingsLabel">Apply and shuffle</span></button>
     </aside>
 
     <script src="./app.js"></script>

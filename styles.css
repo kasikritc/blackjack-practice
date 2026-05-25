@@ -1074,6 +1074,9 @@ h2 { font-size: 22px; }
   gap: 10px;
 }
 
+body[data-mode="table"] [data-settings-for="flash"] { display: none; }
+body[data-mode="flash"] [data-settings-for="table"] { display: none; }
+
 .settings-grid label,
 .toggle-grid label {
   display: grid;
@@ -1192,4 +1195,145 @@ select, input {
   .session-row > div:last-child {
     text-align: left;
   }
+}
+
+/* Home screen */
+.home-screen {
+  width: min(100%, 900px);
+  margin: 0 auto;
+  display: grid;
+  gap: 20px;
+  align-content: start;
+  padding-top: 8vh;
+}
+
+.home-header {
+  text-align: center;
+  display: grid;
+  gap: 6px;
+}
+
+.home-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.mode-card {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  padding: 22px;
+  min-height: 170px;
+  align-content: start;
+  border-radius: 16px;
+  border: 1px solid rgba(217,180,90,.4);
+  background: linear-gradient(160deg, rgba(255,255,255,.07), rgba(0,0,0,.22));
+  transition: border-color .15s ease, transform .15s ease;
+}
+
+.mode-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-2px);
+}
+
+.mode-card strong {
+  font-size: 21px;
+}
+
+.mode-card-eyebrow {
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.mode-card-desc {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+/* Flash screen */
+.flash-shell {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+}
+
+.flash-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.flash-stat {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+}
+
+.flash-stat strong {
+  font-size: 18px;
+}
+
+.flash-stat small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.flash-stage {
+  min-height: 42vh;
+  display: grid;
+  gap: 18px;
+  place-items: center;
+  align-content: center;
+  border-radius: 18px;
+  border: 8px solid #3b2112;
+  background:
+    radial-gradient(circle at 50% 14%, rgba(255,255,255,.12), transparent 32%),
+    radial-gradient(ellipse at center, var(--felt), var(--felt-deep) 78%);
+  padding: 28px 16px;
+}
+
+.flash-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  min-height: calc(clamp(44px, 12vw, 72px) * 1.4);
+}
+
+.flash-cards .card {
+  margin-left: 0;
+}
+
+.flash-cards .card .pip,
+.flash-cards .card .bottom-rank {
+  visibility: visible;
+}
+
+.flash-controls {
+  grid-template-columns: 1fr;
+}
+
+.settings-group-title {
+  margin: 20px 2px 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--gold);
 }

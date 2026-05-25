@@ -26,10 +26,26 @@ const defaultSettings = {
   countCheckCardInterval: 10,
   shuffleImmediately: false,
   sideBetsEnabled: false,
-  animationsEnabled: true
+  animationsEnabled: true,
+  flashMinCards: 2,
+  flashMaxCards: 5,
+  flashDurationMs: 1500
 };
 
 const state = {
+  mode: "home",
+  flash: {
+    cards: [],
+    correctCount: 0,
+    numCards: 0,
+    minCards: 2,
+    maxCards: 5,
+    promptOpenedAt: null,
+    active: false,
+    sessionRange: "7d",
+    sessionLimit: 10,
+    sessionPageSize: 10
+  },
   settings: { ...defaultSettings },
   shoe: null,
   seats: [],
@@ -75,12 +91,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadSettings();
   bindEvents();
   await initAnalytics();
-  startNewShoe();
+  setMode("home");
 });
 
 function bindElements() {
   for (const id of [
     "settingsButton", "closeSettingsButton", "settingsPanel", "applySettingsButton",
+    "settingsEyebrow", "applySettingsLabel",
     "analyticsButton", "closeAnalyticsButton", "analyticsPanel", "trackingStatus", "trackingToggleButton",
     "masteryScore", "masteryLevel", "recentAccuracy", "analyticsMetrics", "trendRange",
     "trendChart", "breakdownGrid", "recentSessions", "sessionRangeSelect", "loadMoreSessionsButton", "refreshAnalyticsButton", "resetAnalyticsButton",
@@ -93,7 +110,15 @@ function bindElements() {
     "dealerThinkDelayMs", "dealerThinkDelayValue", "countPromptDelayMs", "countPromptDelayValue",
     "countCheckMode", "countCheckCardInterval", "shuffleImmediately",
     "surrenderAllowed", "doubleAfterSplit", "resplitAces", "hitSplitAces",
-    "sideBetsEnabled", "animationsEnabled"
+    "sideBetsEnabled", "animationsEnabled",
+    "homeScreen", "tableScreen", "flashScreen", "modeTableButton", "modeFlashButton",
+    "tableHomeButton", "flashHomeButton", "flashAnalyticsButton", "flashSettingsButton",
+    "flashStats", "flashCards", "flashStatus", "flashDealButton",
+    "flashMinCards", "flashMaxCards", "flashDurationMs", "flashDurationValue",
+    "flashAnalyticsPanel", "closeFlashAnalyticsButton", "flashMasteryScore", "flashMasteryLevel",
+    "flashRecentAccuracy", "flashAnalyticsMetrics", "flashTrendRange", "flashTrendChart",
+    "flashBreakdownGrid", "flashRecentSessions", "flashSessionRangeSelect",
+    "flashLoadMoreSessionsButton", "flashRefreshAnalyticsButton", "flashResetAnalyticsButton"
   ]) {
     els[id] = document.getElementById(id);
   }
@@ -147,6 +172,42 @@ function bindEvents() {
   els.shoeDisplayMode.addEventListener("change", applyShoeDisplayModeFromForm);
   els.dealerSpeed.addEventListener("change", handleSpeedPresetChange);
   els.trendRange.addEventListener("change", loadAnalyticsDashboard);
+
+  els.modeTableButton.addEventListener("click", () => setMode("table"));
+  els.modeFlashButton.addEventListener("click", () => setMode("flash"));
+  els.tableHomeButton.addEventListener("click", () => setMode("home"));
+  els.flashHomeButton.addEventListener("click", () => setMode("home"));
+  els.flashDealButton.addEventListener("click", flashDealRound);
+  els.flashSettingsButton.addEventListener("click", () => toggleSettings(true));
+  els.flashAnalyticsButton.addEventListener("click", () => toggleFlashAnalytics(true));
+  els.closeFlashAnalyticsButton.addEventListener("click", () => toggleFlashAnalytics(false));
+  els.flashRefreshAnalyticsButton.addEventListener("click", loadFlashAnalyticsDashboard);
+  els.flashResetAnalyticsButton.addEventListener("click", resetFlashAnalyticsData);
+  els.flashTrendRange.addEventListener("change", loadFlashAnalyticsDashboard);
+  els.flashSessionRangeSelect.addEventListener("change", () => {
+    state.flash.sessionRange = els.flashSessionRangeSelect.value;
+    state.flash.sessionLimit = state.flash.sessionPageSize;
+    loadFlashRecentSessions();
+  });
+  els.flashLoadMoreSessionsButton.addEventListener("click", () => {
+    state.flash.sessionLimit += state.flash.sessionPageSize;
+    loadFlashRecentSessions();
+  });
+  els.flashDurationMs.addEventListener("input", () => {
+    els.flashDurationValue.textContent = `${els.flashDurationMs.value} ms`;
+    state.settings.flashDurationMs = Number(els.flashDurationMs.value);
+    saveSettings();
+  });
+  els.flashMinCards.addEventListener("change", () => {
+    state.settings.flashMinCards = clampFlashCount(els.flashMinCards.value);
+    els.flashMinCards.value = String(state.settings.flashMinCards);
+    saveSettings();
+  });
+  els.flashMaxCards.addEventListener("change", () => {
+    state.settings.flashMaxCards = clampFlashCount(els.flashMaxCards.value);
+    els.flashMaxCards.value = String(state.settings.flashMaxCards);
+    saveSettings();
+  });
 }
 
 function handleKeyboardShortcut(event) {
@@ -191,6 +252,16 @@ function handleKeyboardShortcut(event) {
   }
 
   if (isTyping) return;
+
+  if (state.mode === "flash") {
+    if (key === "n" || key === "enter") {
+      event.preventDefault();
+      if (!els.flashDealButton.disabled) els.flashDealButton.click();
+    }
+    return;
+  }
+
+  if (state.mode !== "table") return;
 
   if (key === "n" || key === "enter") {
     event.preventDefault();
@@ -472,6 +543,10 @@ function openCountCheck(source = "manual") {
       resolve();
       return;
     }
+    if (source !== "flash" && state.mode !== "table") {
+      resolve();
+      return;
+    }
     state.paused = true;
     state.analytics.countPromptOpenedAt = Date.now();
     state.analytics.countPromptSource = source;
@@ -495,6 +570,10 @@ function openCountCheck(source = "manual") {
 
 function submitCountAnswer(event) {
   event.preventDefault();
+  if (state.mode === "flash") {
+    submitFlashAnswer();
+    return;
+  }
   const digits = els.countInput.value.replace(/\D/g, "");
   if (!digits) return;
   const sign = els.countSignButton.dataset.sign === "-1" ? -1 : 1;
@@ -556,7 +635,10 @@ function toggleCountSign() {
 function applyCountDialogFraming(source) {
   const betweenRounds = source === "everyRound" || source === "cutCard";
   els.countDialog.classList.toggle("is-between-rounds", betweenRounds);
-  if (source === "everyRound") {
+  if (source === "flash") {
+    els.countDialogEyebrow.textContent = "Flash count";
+    els.countDialogTitle.textContent = "What is the count for this hand?";
+  } else if (source === "everyRound") {
     els.countDialogEyebrow.textContent = "Place your bet";
     els.countDialogTitle.textContent = "What is the running count?";
   } else if (source === "cutCard") {
@@ -571,6 +653,12 @@ function applyCountDialogFraming(source) {
 function closeCountCheck() {
   if (els.countDialog.open) els.countDialog.close();
   els.countDialog.classList.remove("is-between-rounds");
+  if (state.mode === "flash") {
+    state.countPromptResolve = null;
+    state.paused = false;
+    els.flashStatus.textContent = "Press Deal for the next round.";
+    return;
+  }
   state.paused = false;
   els.pauseButton.querySelector("span").textContent = "Pause";
   resumePausedWaits();
@@ -580,6 +668,151 @@ function closeCountCheck() {
     resolve();
   }
   render();
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  toggleSettings(false);
+  toggleAnalytics(false);
+  toggleFlashAnalytics(false);
+  if (els.countDialog.open) els.countDialog.close();
+  state.paused = false;
+  els.homeScreen.hidden = mode !== "home";
+  els.tableScreen.hidden = mode !== "table";
+  els.flashScreen.hidden = mode !== "flash";
+  document.body.dataset.mode = mode;
+  if (mode === "table") {
+    if (!state.shoe) startNewShoe();
+  } else if (mode === "flash") {
+    state.flash.active = false;
+    els.flashDealButton.disabled = false;
+    els.flashCards.innerHTML = "";
+    els.flashStatus.textContent = "Press Deal to start a round.";
+    refreshFlashStats();
+  }
+}
+
+function clampFlashCount(value) {
+  const number = Math.round(Number(value));
+  if (!Number.isFinite(number)) return 2;
+  return Math.max(1, Math.min(8, number));
+}
+
+function makeFlashCards(count) {
+  const cards = [];
+  for (let i = 0; i < count; i += 1) {
+    const rank = ranks[Math.floor(Math.random() * ranks.length)];
+    const suit = suits[Math.floor(Math.random() * suits.length)];
+    cardSerial += 1;
+    cards.push({ rank, suit, id: `flash-${suit}-${rank}-${cardSerial}`, visible: true, counted: false });
+  }
+  return cards;
+}
+
+function flashCardHtml(card, faceUp) {
+  if (!faceUp || !card) return `<div class="card back" aria-label="Face-down card"></div>`;
+  const red = redSuits.has(card.suit) ? " red" : "";
+  const symbol = suitSymbols[card.suit];
+  return `
+    <div class="card${red} is-new" aria-label="${card.rank} of ${card.suit}">
+      <span class="rank corner"><span>${card.rank}</span><span>${symbol}</span></span>
+      <span class="pip">${symbol}</span>
+      <span class="rank bottom-rank corner"><span>${card.rank}</span><span>${symbol}</span></span>
+    </div>
+  `;
+}
+
+async function flashDealRound() {
+  if (state.mode !== "flash" || els.countDialog.open) return;
+  const lo = clampFlashCount(state.settings.flashMinCards);
+  const hi = clampFlashCount(state.settings.flashMaxCards);
+  const min = Math.min(lo, hi);
+  const max = Math.max(lo, hi);
+  const count = min + Math.floor(Math.random() * (max - min + 1));
+  const cards = makeFlashCards(count);
+  state.flash.cards = cards;
+  state.flash.correctCount = cards.reduce((sum, card) => sum + getHiLoValue(card), 0);
+  state.flash.numCards = count;
+  state.flash.minCards = min;
+  state.flash.maxCards = max;
+  state.flash.active = true;
+  els.flashCards.innerHTML = cards.map(card => flashCardHtml(card, true)).join("");
+  els.flashStatus.textContent = "Memorize the cards…";
+  els.flashDealButton.disabled = true;
+  await delay(Math.max(300, Number(state.settings.flashDurationMs) || 1500));
+  if (state.mode !== "flash" || !state.flash.active) return;
+  els.flashCards.innerHTML = cards.map(() => flashCardHtml(null, false)).join("");
+  els.flashStatus.textContent = "What is the count?";
+  els.flashDealButton.disabled = false;
+  state.flash.promptOpenedAt = Date.now();
+  openCountCheck("flash");
+}
+
+function submitFlashAnswer() {
+  const digits = els.countInput.value.replace(/\D/g, "");
+  if (!digits) return;
+  const sign = els.countSignButton.dataset.sign === "-1" ? -1 : 1;
+  const answer = sign * Number.parseInt(digits, 10);
+  const correct = answer === state.flash.correctCount;
+  const signedError = answer - state.flash.correctCount;
+  const responseTimeMs = Date.now() - (state.flash.promptOpenedAt || Date.now());
+  analyticsRecordFlashRound({ answer, correct, signedError, responseTimeMs });
+  const cards = state.flash.cards;
+  els.flashCards.innerHTML = cards.map(card => flashCardHtml(card, true)).join("");
+  const cardRows = cards.map(card => `
+    <span class="count-card">
+      <span>${cardLabel(card)}</span>
+      <strong>${signed(getHiLoValue(card))}</strong>
+    </span>
+  `).join("");
+  els.countFeedback.hidden = false;
+  els.countFeedback.className = `feedback ${correct ? "correct" : "incorrect"}`;
+  els.countFeedback.innerHTML = `
+    <section class="feedback-section result-section">
+      <strong>${correct ? "Correct" : "Incorrect"}</strong>
+      <span>Count ${signed(state.flash.correctCount)}</span>
+    </section>
+    <section class="feedback-section">
+      <h3>Cards This Round</h3>
+      <div class="count-card-grid">${cardRows}</div>
+    </section>
+  `;
+  els.submitCountButton.hidden = true;
+  els.continueButton.hidden = false;
+  els.flashStatus.textContent = correct ? "Correct! Deal again." : `Count was ${signed(state.flash.correctCount)}.`;
+  state.flash.active = false;
+  refreshFlashStats();
+}
+
+function analyticsRecordFlashRound(details) {
+  if (!analyticsShouldTrack()) return;
+  const payload = {
+    numCards: state.flash.numCards,
+    correctCount: state.flash.correctCount,
+    userAnswer: details.answer,
+    signedError: details.signedError,
+    absoluteError: Math.abs(details.signedError),
+    correct: details.correct,
+    responseTimeMs: details.responseTimeMs,
+    flashDurationMs: Number(state.settings.flashDurationMs),
+    minCards: state.flash.minCards,
+    maxCards: state.flash.maxCards,
+    cards: state.flash.cards.map((card, index) => ({
+      visibleOrder: index + 1,
+      rank: card.rank,
+      suit: card.suit,
+      hiLoValue: getHiLoValue(card)
+    }))
+  };
+  ensureAnalyticsSession().then(sessionId => {
+    if (!sessionId) return;
+    return apiRequest("/api/events/flash-round-submitted", {
+      method: "POST",
+      body: { ...payload, sessionId }
+    });
+  }).then(() => {
+    if (els.flashAnalyticsPanel.classList.contains("open")) loadFlashAnalyticsDashboard();
+  }).catch(error => console.warn("Could not record flash round", error));
 }
 
 function handValue(hand) {
@@ -756,11 +989,14 @@ function applySettings() {
     countCheckCardInterval: Number(els.countCheckCardInterval.value),
     shuffleImmediately: els.shuffleImmediately.value === "true",
     sideBetsEnabled: els.sideBetsEnabled.checked,
-    animationsEnabled: els.animationsEnabled.checked
+    animationsEnabled: els.animationsEnabled.checked,
+    flashMinCards: clampFlashCount(els.flashMinCards.value),
+    flashMaxCards: clampFlashCount(els.flashMaxCards.value),
+    flashDurationMs: Number(els.flashDurationMs.value)
   };
   saveSettings();
   toggleSettings(false);
-  startNewShoe();
+  if (state.mode === "table") startNewShoe();
 }
 
 function loadSettings() {
@@ -786,9 +1022,15 @@ function syncSettingsForm() {
   els.playerThinkDelayValue.textContent = `${state.settings.playerThinkDelayMs} ms`;
   els.dealerThinkDelayValue.textContent = `${state.settings.dealerThinkDelayMs} ms`;
   els.countPromptDelayValue.textContent = `${state.settings.countPromptDelayMs} ms`;
+  els.flashDurationValue.textContent = `${state.settings.flashDurationMs} ms`;
 }
 
 function toggleSettings(open) {
+  if (open) {
+    const flash = state.mode === "flash";
+    els.settingsEyebrow.textContent = flash ? "Flash Count" : "Table rules";
+    els.applySettingsLabel.textContent = flash ? "Apply" : "Apply and shuffle";
+  }
   els.settingsPanel.hidden = false;
   els.settingsPanel.classList.toggle("open", open);
   els.settingsPanel.setAttribute("aria-hidden", String(!open));
@@ -1165,12 +1407,12 @@ function metricTile(label, value, hint) {
   `;
 }
 
-function renderTrendChart(days) {
+function renderTrendChart(days, target = els.trendChart) {
   if (!days.length) {
-    els.trendChart.innerHTML = `<p class="empty-state">No count checks yet.</p>`;
+    target.innerHTML = `<p class="empty-state">No data yet.</p>`;
     return;
   }
-  els.trendChart.innerHTML = days.slice(-18).map(day => {
+  target.innerHTML = days.slice(-18).map(day => {
     const height = Math.max(4, Math.round(day.accuracy));
     return `
       <div class="trend-bar" title="${day.day}: ${formatPercent(day.accuracy)}% accuracy">
@@ -1339,6 +1581,171 @@ async function resetAnalyticsData() {
     loadAnalyticsDashboard();
   } catch (error) {
     console.warn("Could not reset analytics", error);
+  }
+}
+
+function toggleFlashAnalytics(open) {
+  els.flashAnalyticsPanel.hidden = false;
+  els.flashAnalyticsPanel.classList.toggle("open", open);
+  els.flashAnalyticsPanel.setAttribute("aria-hidden", String(!open));
+  if (open) loadFlashAnalyticsDashboard();
+  else setTimeout(() => {
+    if (!els.flashAnalyticsPanel.classList.contains("open")) els.flashAnalyticsPanel.hidden = true;
+  }, 180);
+}
+
+async function refreshFlashStats() {
+  if (!state.analytics.serverAvailable) {
+    els.flashStats.innerHTML = `<span class="flash-stat"><strong>—</strong><small>Stats need the local API</small></span>`;
+    return;
+  }
+  try {
+    renderFlashStatsBar(await apiRequest("/api/analytics/flash-summary"));
+  } catch (error) {
+    console.warn("Could not load flash stats", error);
+  }
+}
+
+function renderFlashStatsBar(summary) {
+  const rounds = summary.totals?.rounds || 0;
+  els.flashStats.innerHTML = `
+    <span class="flash-stat"><strong>${rounds ? `${formatPercent(summary.recentAccuracy)}%` : "—"}</strong><small>Recent accuracy</small></span>
+    <span class="flash-stat"><strong>${rounds}</strong><small>Rounds</small></span>
+    <span class="flash-stat"><strong>${summary.currentStreak || 0}</strong><small>Streak</small></span>
+    <span class="flash-stat"><strong>${summary.bestStreak || 0}</strong><small>Best</small></span>
+    <span class="flash-stat"><strong>${rounds ? formatMs(summary.medianResponse) : "—"}</strong><small>Median time</small></span>
+  `;
+}
+
+async function loadFlashAnalyticsDashboard() {
+  if (!state.analytics.serverAvailable) {
+    renderEmptyFlashAnalytics("Start the app with npm run dev to enable SQLite analytics.");
+    return;
+  }
+  try {
+    const [summary, trends] = await Promise.all([
+      apiRequest("/api/analytics/flash-summary"),
+      apiRequest(`/api/analytics/flash-trends?range=${encodeURIComponent(els.flashTrendRange.value)}`)
+    ]);
+    renderFlashSummary(summary);
+    renderTrendChart(trends.days || [], els.flashTrendChart);
+    state.flash.sessionLimit = state.flash.sessionPageSize;
+    await loadFlashRecentSessions();
+  } catch (error) {
+    console.warn("Could not load flash analytics", error);
+    renderEmptyFlashAnalytics("Analytics data could not be loaded.");
+  }
+}
+
+function renderFlashSummary(summary) {
+  const hasRounds = (summary.totals?.rounds || 0) > 0;
+  els.flashMasteryScore.textContent = hasRounds ? String(summary.masteryScore || 0) : "—";
+  els.flashMasteryLevel.textContent = hasRounds ? (summary.level || "No data yet") : "Needs rounds";
+  els.flashRecentAccuracy.textContent = hasRounds ? `${formatPercent(summary.recentAccuracy)}%` : "—";
+  els.flashAnalyticsMetrics.innerHTML = hasRounds ? flashMetricSections(summary) : `<p class="empty-state">No flash rounds yet.</p>`;
+  renderFlashBreakdowns(summary);
+}
+
+function flashMetricSections(summary) {
+  return `
+    ${metricGroup("Performance", [
+      metricTile("All-time accuracy", `${formatPercent(summary.accuracy)}%`, "Every round"),
+      metricTile("Average error", formatNumber(summary.avgError), "Absolute count miss"),
+      metricTile("Median speed", formatMs(summary.medianResponse), "Typical answer time"),
+      metricTile("P90 speed", formatMs(summary.p90Response), "Slower responses")
+    ])}
+    ${metricGroup("Consistency", [
+      metricTile("Current streak", summary.currentStreak, "Correct rounds"),
+      metricTile("Best streak", summary.bestStreak, "Correct rounds"),
+      metricTile("No major miss", summary.noMajorErrorStreak, "Errors under 3")
+    ])}
+    ${metricGroup("Practice volume", [
+      metricTile("Rounds played", summary.totals?.rounds || 0, "Submitted answers"),
+      metricTile("Cards seen", summary.totals?.cards || 0, "Across rounds"),
+      metricTile("Avg hand size", formatCards(summary.avgCards), "Cards per round"),
+      metricTile("Sessions", summary.totals?.sessions || 0, "Tracked visits")
+    ])}
+  `;
+}
+
+function renderFlashBreakdowns(summary) {
+  const sections = [
+    ["By hand size", summary.byCardCount || []],
+    ["Error size", [
+      { label: "Perfect", checks: summary.errorBuckets?.perfect || 0 },
+      { label: "Off by 1", checks: summary.errorBuckets?.one || 0 },
+      { label: "Off by 2", checks: summary.errorBuckets?.two || 0 },
+      { label: "Major", checks: summary.errorBuckets?.major || 0 }
+    ]]
+  ];
+  els.flashBreakdownGrid.innerHTML = `
+    <section class="breakdown-family">
+      <div class="breakdown-family-grid">
+        ${sections.map(([title, rows]) => breakdownBlock(title, rows)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderEmptyFlashAnalytics(message) {
+  els.flashMasteryScore.textContent = "0";
+  els.flashMasteryLevel.textContent = "No data yet";
+  els.flashRecentAccuracy.textContent = "0%";
+  els.flashAnalyticsMetrics.innerHTML = `<p class="empty-state">${message}</p>`;
+  els.flashTrendChart.innerHTML = `<p class="empty-state">${message}</p>`;
+  els.flashBreakdownGrid.innerHTML = "";
+  els.flashRecentSessions.innerHTML = "";
+}
+
+async function loadFlashRecentSessions() {
+  if (!state.analytics.serverAvailable) return;
+  const limit = state.flash.sessionLimit;
+  const range = state.flash.sessionRange;
+  try {
+    const data = await apiRequest(`/api/analytics/flash-sessions?limit=${limit + 1}&range=${encodeURIComponent(range)}`);
+    const all = data.sessions || [];
+    renderFlashSessions(all.slice(0, limit), all.length > limit);
+  } catch (error) {
+    console.warn("Could not load flash sessions", error);
+    renderFlashSessions([], false);
+  }
+}
+
+function renderFlashSessions(sessions, hasMore) {
+  if (!sessions.length) {
+    els.flashRecentSessions.innerHTML = `<p class="empty-state">No sessions in this range.</p>`;
+    els.flashLoadMoreSessionsButton.hidden = true;
+    return;
+  }
+  const groups = groupSessionsByDay(sessions);
+  els.flashRecentSessions.innerHTML = groups.map(group => `
+    <div class="session-day-header">${group.label}</div>
+    ${group.items.map(session => `
+      <div class="session-row">
+        <div>
+          <strong>${formatTimeOnly(session.started_at)}</strong>
+          <span>${session.checks || 0} rounds · ${formatCards(session.avg_cards)} avg</span>
+        </div>
+        <div>
+          <strong>${session.checks ? `${formatPercent(session.accuracy)}%` : "—"}</strong>
+          <span>${session.checks ? `${formatNumber(session.avg_error)} avg err · ${formatMs(session.avg_response_ms)}` : "No rounds yet"}</span>
+        </div>
+      </div>
+    `).join("")}
+  `).join("");
+  els.flashLoadMoreSessionsButton.hidden = !hasMore;
+}
+
+async function resetFlashAnalyticsData() {
+  if (!state.analytics.serverAvailable) return;
+  const confirmed = window.confirm("Delete all recorded Flash Count data? This cannot be undone.");
+  if (!confirmed) return;
+  try {
+    await apiRequest("/api/analytics/flash", { method: "DELETE" });
+    loadFlashAnalyticsDashboard();
+    refreshFlashStats();
+  } catch (error) {
+    console.warn("Could not reset flash analytics", error);
   }
 }
 

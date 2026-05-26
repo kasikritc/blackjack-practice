@@ -423,6 +423,9 @@ export function BasicStrategy() {
     : [];
 
   const insuranceLabel = rules.insurance ? "Insurance pays 2:1" : "Insurance not offered";
+  const statusMessage =
+    session.feedback ||
+    (decision && !decision.expectedAction ? decisionBlockedMessage(decision) : "");
 
   return (
     <div className="drill strategy-shell" data-mode="strategy">
@@ -481,14 +484,11 @@ export function BasicStrategy() {
         </div>
       </div>
 
-      <p className={`status-line strategy-feedback ${session.feedbackType}`} role="status">
-        {session.feedback ||
-          (decision
-            ? decision.expectedAction
-              ? `What is the play for ${decision.label} vs dealer ${decision.dealer}?`
-              : decisionBlockedMessage(decision)
-            : "")}
-      </p>
+      {statusMessage ? (
+        <p className={`status-line strategy-feedback ${session.feedbackType}`} role="status">
+          {statusMessage}
+        </p>
+      ) : null}
 
       <div className="strategy-actions" aria-label="Strategy actions">
         {ACTIONS.map(({ action, key }) => {

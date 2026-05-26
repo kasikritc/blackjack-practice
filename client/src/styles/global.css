@@ -1552,7 +1552,33 @@ button:disabled {
   font-weight: 800;
 }
 .strategy-review-selects {
-  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.75fr) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.75fr) auto auto;
+}
+.strategy-view-toggle {
+  min-height: 44px;
+  display: inline-grid;
+  grid-template-columns: repeat(2, max-content);
+  align-items: stretch;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.strategy-view-toggle button {
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+.strategy-view-toggle button + button {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+.strategy-view-toggle button.is-active {
+  background: rgba(217, 180, 90, 0.22);
+  color: var(--paper);
 }
 .strategy-chart-editor {
   display: grid;
@@ -1744,6 +1770,14 @@ button:disabled {
   position: relative;
   opacity: 0.44;
   filter: grayscale(0.42);
+}
+.strategy-cell.is-fallback-needed {
+  outline: 1px solid rgba(217, 180, 90, 0.55);
+  outline-offset: -2px;
+}
+.strategy-cell.is-fallback-disabled {
+  opacity: 0.24;
+  filter: grayscale(0.75);
 }
 .strategy-cell.is-excluded::before,
 .strategy-cell.is-excluded::after {

@@ -177,8 +177,15 @@ export function BasicStrategy() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentChart]);
 
+  const decisionBlockedMessage = (dec: NonNullable<typeof decision>) => {
+    if (dec.expectedActionSource === "missing-fallback") {
+      return `Set the after-hit fallback for ${dec.label} vs dealer ${dec.dealer} in the strategy chart.`;
+    }
+    return `Set a legal chart action for ${dec.label} vs dealer ${dec.dealer}.`;
+  };
+
   const recordAttempt = (action: string, dec: NonNullable<typeof decision>, correct: boolean) => {
-    if (!serverAvailable) return;
+    if (!serverAvailable || !dec.expectedAction) return;
     api
       .strategyAttempt({
         ruleProfileId: profileId ?? undefined,
@@ -206,6 +213,14 @@ export function BasicStrategy() {
         rules
       );
       if (!dec) return;
+      if (!dec.expectedAction) {
+        setSession(sessionState => ({
+          ...sessionState,
+          feedback: decisionBlockedMessage(dec),
+          feedbackType: "incorrect"
+        }));
+        return;
+      }
       const correct = action === dec.expectedAction;
       recordAttempt(action, dec, correct);
       if (!correct) {
@@ -294,7 +309,7 @@ export function BasicStrategy() {
       const action = STRATEGY_ACTION_KEYS[key];
       if (
         action &&
-        decision &&
+        decision?.expectedAction &&
         isStrategyActionLegal(
           action,
           rules,
@@ -355,17 +370,32 @@ export function BasicStrategy() {
   };
 
   // Live in-memory chart cell edit (drill uses it immediately; persisted on Save chart).
-  const onChartCellChange = (category: string, rowKey: string, dealer: string, action: string) => {
+  const onChartCellChange = (
+    category: string,
+    rowKey: string,
+    dealer: string,
+    action: string,
+    target: "opening" | "fallback"
+  ) => {
     setData(prev => {
       if (!prev) return prev;
       return {
         ...prev,
         charts: prev.charts.map(c => {
           if (c.id !== chartId) return c;
-          const chart = c.chart as unknown as Record<
-            string,
-            Record<string, Record<string, string>>
-          >;
+          const chart = c.chart as unknown as Record<string, any>;
+          if (target === "fallback") {
+            const fallbacks = { ...((chart.fallbacks as Record<string, any>) || {}) };
+            const updatedCategory = { ...(fallbacks[category] || {}) };
+            updatedCategory[rowKey] = { ...(updatedCategory[rowKey] || {}), [dealer]: action };
+            return {
+              ...c,
+              chart: {
+                ...chart,
+                fallbacks: { ...fallbacks, [category]: updatedCategory }
+              } as unknown as typeof c.chart
+            };
+          }
           const updatedCategory = { ...(chart[category] || {}) };
           updatedCategory[rowKey] = { ...(updatedCategory[rowKey] || {}), [dealer]: action };
           return {
@@ -453,12 +483,16 @@ export function BasicStrategy() {
 
       <p className={`status-line strategy-feedback ${session.feedbackType}`} role="status">
         {session.feedback ||
-          (decision ? `What is the play for ${decision.label} vs dealer ${decision.dealer}?` : "")}
+          (decision
+            ? decision.expectedAction
+              ? `What is the play for ${decision.label} vs dealer ${decision.dealer}?`
+              : decisionBlockedMessage(decision)
+            : "")}
       </p>
 
       <div className="strategy-actions" aria-label="Strategy actions">
         {ACTIONS.map(({ action, key }) => {
-          const legal = decision
+          const legal = decision?.expectedAction
             ? isStrategyActionLegal(
                 action,
                 rules,

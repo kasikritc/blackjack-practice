@@ -48,10 +48,13 @@ export interface StrategyRules {
 /** A category map: row key (e.g. "h16", "s18", "pA") -> dealer column -> action. */
 export type StrategyCellMap = Record<string, Record<string, StrategyAction>>;
 
+export type StrategyFallbackMap = Partial<Record<StrategyCategory, StrategyCellMap>>;
+
 export interface StrategyChart {
   hard: StrategyCellMap;
   soft: StrategyCellMap;
   pair: StrategyCellMap;
+  fallbacks?: StrategyFallbackMap;
 }
 
 export interface StrategySubsetCriteria {

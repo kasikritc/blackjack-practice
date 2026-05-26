@@ -4,6 +4,7 @@ import {
   defaultStrategyChart,
   defaultStrategyRules,
   defaultStrategySubsets,
+  backfillStrategyFallbacks,
   strategyData
 } from "../domain/strategy.js";
 import { nowIso, parseSettingsJson } from "../util.js";
@@ -40,9 +41,11 @@ strategyRouter.post("/strategy/charts", (req, res) => {
         `SELECT chart_json FROM strategy_charts WHERE id = ${Number(body.cloneFromChartId)} LIMIT 1`
       )[0]
     : null;
-  const chartJson =
-    body.chart ||
-    (clone?.chart_json ? parseSettingsJson(clone.chart_json) : defaultStrategyChart());
+  const chartJson = body.chart
+    ? backfillStrategyFallbacks(body.chart)
+    : clone?.chart_json
+      ? backfillStrategyFallbacks(parseSettingsJson(clone.chart_json))
+      : defaultStrategyChart();
   const row = insert("strategy_charts", {
     rule_profile_id: body.ruleProfileId,
     name: body.name || "Custom strategy",
@@ -56,7 +59,7 @@ strategyRouter.patch("/strategy/charts/:id", (req, res) => {
   update("strategy_charts", Number(req.params.id), {
     rule_profile_id: body.ruleProfileId,
     name: body.name,
-    chart_json: body.chart ? JSON.stringify(body.chart) : undefined,
+    chart_json: body.chart ? JSON.stringify(backfillStrategyFallbacks(body.chart)) : undefined,
     updated_at: nowIso()
   });
   res.status(200).json({ ok: true, ...strategyData() });

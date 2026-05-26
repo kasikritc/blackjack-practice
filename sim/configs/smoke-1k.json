@@ -3,6 +3,7 @@
   "seed": "42",
   "decks": 6,
   "samplesPerAction": 1000,
+  "policySamplesPerDecision": 6,
   "dealerHitsSoft17": true,
   "doubleAfterSplit": true,
   "surrender": "late",

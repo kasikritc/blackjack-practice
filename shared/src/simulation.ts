@@ -5,6 +5,7 @@ export interface StrategySimulationConfig {
   seed: string;
   rules: StrategyRules;
   samplesPerAction: number;
+  policySamplesPerDecision?: number;
   trueCountBuckets: number[];
   decksRemainingBuckets: number[];
   maxPolicyIterations: number;

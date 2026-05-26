@@ -31,7 +31,7 @@ struct Shoe {
 
 enum class Action : uint8_t { Stand, Hit, Double, Surrender, Split };
 
-constexpr const char* kSimulatorVersion = "0.1.1";
+constexpr const char* kSimulatorVersion = "0.2.1";
 
 struct Rules {
   int decks = 6;
@@ -49,6 +49,7 @@ struct Config {
   std::string name = "strategy-sim";
   std::string seed = "default-seed";
   int samples_per_action = 200;
+  int policy_samples_per_decision = 6;
   int true_count = 0;
   double decks_remaining = 6.0;
   int max_policy_iterations = 1;
@@ -138,6 +139,7 @@ Config parse_config(const std::string& path) {
   c.name = json_string(text, "name", c.name);
   c.seed = json_string(text, "seed", c.seed);
   c.samples_per_action = std::max(1, json_int(text, "samplesPerAction", c.samples_per_action));
+  c.policy_samples_per_decision = std::max(1, std::min(64, json_int(text, "policySamplesPerDecision", c.policy_samples_per_decision)));
   c.true_count = json_int(text, "trueCount", c.true_count);
   c.decks_remaining = json_double(text, "decksRemaining", c.decks_remaining);
   c.max_policy_iterations = std::max(1, json_int(text, "maxPolicyIterations", c.max_policy_iterations));
@@ -334,7 +336,7 @@ Outcome play_action(const Config& config, Action action, Hand player, Hand deale
 Outcome optimal_ev(const Config& config, Hand player, Hand dealer, Shoe shoe, std::mt19937_64& rng, int depth, int split_hands, bool can_double, bool can_surrender, bool after_split_aces) {
   if (value_of(player).total > 21) return {-1.0, false, true};
   if (depth >= 8) return settle(config.rules, player, dealer, shoe, rng, 1.0, false);
-  const int policy_samples = std::max(6, std::min(32, config.samples_per_action / 8));
+  const int policy_samples = config.policy_samples_per_decision;
   double best = -100.0;
   Outcome best_outcome;
   for (const Action action : legal_actions(config.rules, player, can_double, can_surrender, after_split_aces, split_hands)) {
@@ -524,6 +526,7 @@ void write_manifest(const Config& config, const std::filesystem::path& run_dir, 
       << "    \"name\": \"" << config.name << "\",\n    \"seed\": \"" << config.seed << "\",\n"
       << "    \"rules\": " << rules_json(config.rules) << ",\n"
       << "    \"samplesPerAction\": " << config.samples_per_action << ",\n"
+      << "    \"policySamplesPerDecision\": " << config.policy_samples_per_decision << ",\n"
       << "    \"trueCountBuckets\": [" << config.true_count << "],\n"
       << "    \"decksRemainingBuckets\": [" << config.decks_remaining << "],\n"
       << "    \"maxPolicyIterations\": " << config.max_policy_iterations << ",\n"
@@ -576,7 +579,7 @@ void write_summary(const Config& config, const std::vector<CellResult>& cells, c
 
 void write_summary_json(const Config& config, const std::vector<CellResult>& cells, const std::filesystem::path& run_dir, const std::string& run_id) {
   std::ofstream out(run_dir / "simulation-summary.json");
-  out << "{\"manifest\":{\"id\":\"" << run_id << "\",\"createdAt\":\"" << now_compact() << "\",\"simulatorVersion\":\"" << kSimulatorVersion << "\",\"config\":{\"name\":\"" << config.name << "\",\"seed\":\"" << config.seed << "\",\"rules\":" << rules_json(config.rules) << ",\"samplesPerAction\":" << config.samples_per_action << ",\"trueCountBuckets\":[" << config.true_count << "],\"decksRemainingBuckets\":[" << config.decks_remaining << "],\"maxPolicyIterations\":" << config.max_policy_iterations << ",\"convergenceEpsilon\":" << config.convergence_epsilon << "}},\"cells\":[";
+  out << "{\"manifest\":{\"id\":\"" << run_id << "\",\"createdAt\":\"" << now_compact() << "\",\"simulatorVersion\":\"" << kSimulatorVersion << "\",\"config\":{\"name\":\"" << config.name << "\",\"seed\":\"" << config.seed << "\",\"rules\":" << rules_json(config.rules) << ",\"samplesPerAction\":" << config.samples_per_action << ",\"policySamplesPerDecision\":" << config.policy_samples_per_decision << ",\"trueCountBuckets\":[" << config.true_count << "],\"decksRemainingBuckets\":[" << config.decks_remaining << "],\"maxPolicyIterations\":" << config.max_policy_iterations << ",\"convergenceEpsilon\":" << config.convergence_epsilon << "}},\"cells\":[";
   bool first_cell = true;
   for (const auto& cell : cells) {
     out << (first_cell ? "" : ",");

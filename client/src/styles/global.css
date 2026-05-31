@@ -1421,7 +1421,7 @@ button:disabled {
 .deck-countdown-cards {
   min-height: calc(clamp(44px, 12vw, 72px) * 1.6);
   perspective: 900px;
-  perspective-origin: center 42%;
+  perspective-origin: center 58%;
 }
 .deck-flip-card {
   display: inline-grid;
@@ -1440,14 +1440,14 @@ button:disabled {
     linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 38%),
     repeating-linear-gradient(45deg, #23463f 0 6px, #17382f 6px 12px);
   transform: translateZ(0.2px);
-  transform-origin: center top;
+  transform-origin: center bottom;
   backface-visibility: hidden;
   animation: countdown-card-back 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
   animation-delay: calc(var(--flip-index, 0) * 42ms);
   pointer-events: none;
 }
 .deck-flip-card .card {
-  transform-origin: center top;
+  transform-origin: center bottom;
   backface-visibility: hidden;
   animation: countdown-card-face 260ms cubic-bezier(0.2, 0.9, 0.2, 1.05) both;
   animation-delay: calc(var(--flip-index, 0) * 42ms);
@@ -1475,19 +1475,19 @@ button:disabled {
   }
   58% {
     opacity: 1;
-    transform: translateZ(0.2px) rotateX(84deg);
+    transform: translateZ(0.2px) rotateX(-84deg);
   }
   59%,
   100% {
     opacity: 0;
-    transform: translateZ(0.2px) rotateX(88deg);
+    transform: translateZ(0.2px) rotateX(-88deg);
   }
 }
 @keyframes countdown-card-face {
   0%,
   46% {
     opacity: 0.96;
-    transform: rotateX(-78deg);
+    transform: rotateX(78deg);
     filter: brightness(0.95);
   }
   100% {

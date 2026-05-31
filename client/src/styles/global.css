@@ -1420,8 +1420,33 @@ button:disabled {
 }
 .deck-countdown-cards {
   min-height: calc(clamp(44px, 12vw, 72px) * 1.6);
+  position: relative;
   perspective: 1200px;
   perspective-origin: center 30%;
+}
+.deck-current-cards,
+.deck-previous-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+.deck-current-cards {
+  position: relative;
+  z-index: 2;
+}
+.deck-previous-cards {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  align-items: center;
+  pointer-events: none;
+}
+.deck-previous-card {
+  display: inline-grid;
+}
+.deck-previous-card .card {
+  box-shadow: none;
 }
 .deck-flip-card {
   display: inline-grid;

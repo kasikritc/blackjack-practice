@@ -68,6 +68,7 @@ export function DeckCountdown() {
   const [settings, setSettings] = useSettings();
   const [phase, setPhase] = useState<Phase>("idle");
   const [currentCards, setCurrentCards] = useState<GameCard[]>([]);
+  const [previousCards, setPreviousCards] = useState<GameCard[]>([]);
   const [cardsShown, setCardsShown] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [countdown, setCountdown] = useState(3);
@@ -88,10 +89,16 @@ export function DeckCountdown() {
   const autoTimerRef = useRef<number | null>(null);
   const countdownTimerRef = useRef<number | null>(null);
   const elapsedTimerRef = useRef<number | null>(null);
+  const previousCardsTimerRef = useRef<number | null>(null);
+  const currentCardsRef = useRef<GameCard[]>([]);
 
   useEffect(() => {
     configureTracking(settings);
   }, [settings]);
+
+  useEffect(() => {
+    currentCardsRef.current = currentCards;
+  }, [currentCards]);
 
   const refreshStats = useCallback(() => {
     api
@@ -108,9 +115,11 @@ export function DeckCountdown() {
     if (autoTimerRef.current) window.clearInterval(autoTimerRef.current);
     if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
     if (elapsedTimerRef.current) window.clearInterval(elapsedTimerRef.current);
+    if (previousCardsTimerRef.current) window.clearTimeout(previousCardsTimerRef.current);
     autoTimerRef.current = null;
     countdownTimerRef.current = null;
     elapsedTimerRef.current = null;
+    previousCardsTimerRef.current = null;
   }, []);
 
   useEffect(() => () => clearTimers(), [clearTimers]);
@@ -143,7 +152,14 @@ export function DeckCountdown() {
     const cardsPerFlip = clampDeckCountdownCardsPerFlip(settings.deckCountdownCardsPerFlip);
     const start = nextIndexRef.current;
     const end = Math.min(deckRef.current.length, start + cardsPerFlip);
-    setCurrentCards(deckRef.current.slice(start, end));
+    const nextCards = deckRef.current.slice(start, end);
+    if (previousCardsTimerRef.current) window.clearTimeout(previousCardsTimerRef.current);
+    setPreviousCards(currentCardsRef.current);
+    setCurrentCards(nextCards);
+    previousCardsTimerRef.current = window.setTimeout(
+      () => setPreviousCards([]),
+      390 + Math.max(0, nextCards.length - 1) * 42
+    );
     nextIndexRef.current = end;
     setCardsShown(end);
     setPhase("running");
@@ -163,6 +179,7 @@ export function DeckCountdown() {
     startedAtRef.current = null;
     finishedElapsedRef.current = 0;
     setCurrentCards([]);
+    setPreviousCards([]);
     setCardsShown(0);
     setElapsedMs(0);
     setAnswer("");
@@ -177,6 +194,7 @@ export function DeckCountdown() {
     finishedElapsedRef.current = 0;
     setPhase("idle");
     setCurrentCards([]);
+    setPreviousCards([]);
     setCardsShown(0);
     setElapsedMs(0);
     setAnswer("");
@@ -377,15 +395,26 @@ export function DeckCountdown() {
         {phase === "countdown" ? <div className="countdown-number">{countdown}</div> : null}
 
         <div className="flash-cards deck-countdown-cards" aria-live="polite">
-          {currentCards.map((card, index) => (
-            <span
-              className="deck-flip-card"
-              key={card.id}
-              style={{ "--flip-index": index } as CSSProperties}
-            >
-              <PlayingCard card={card} faceUp />
-            </span>
-          ))}
+          {previousCards.length ? (
+            <div className="deck-previous-cards" aria-hidden="true">
+              {previousCards.map(card => (
+                <span className="deck-previous-card" key={card.id}>
+                  <PlayingCard card={card} faceUp />
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <div className="deck-current-cards">
+            {currentCards.map((card, index) => (
+              <span
+                className="deck-flip-card"
+                key={card.id}
+                style={{ "--flip-index": index } as CSSProperties}
+              >
+                <PlayingCard card={card} faceUp />
+              </span>
+            ))}
+          </div>
         </div>
 
         {phase === "complete" ? (

@@ -1395,25 +1395,28 @@ button:disabled {
   min-height: 46vh;
 }
 .deck-progress {
-  width: min(100%, 560px);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--muted);
+  padding: 6px 2px 0;
+  color: rgba(184, 197, 191, 0.72);
   font-size: 12px;
   font-weight: 800;
 }
 .deck-progress strong {
-  color: var(--gold);
-  font-size: 20px;
+  color: rgba(217, 180, 90, 0.78);
+  font-size: 14px;
 }
 .deck-progress span:last-child {
   text-align: right;
+}
+.deck-status {
+  margin: -8px 2px 0;
+  color: rgba(184, 197, 191, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
 }
 .deck-countdown-cards {
   min-height: calc(clamp(44px, 12vw, 72px) * 1.6);

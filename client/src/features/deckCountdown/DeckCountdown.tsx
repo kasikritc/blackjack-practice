@@ -349,26 +349,12 @@ export function DeckCountdown() {
       </section>
 
       <section className="flash-stage deck-countdown-stage">
-        <div className="deck-progress" aria-label="Deck countdown progress">
-          <span>{formatCards(cardsShown)} shown</span>
-          <strong>{progress}%</strong>
-          {settings.deckCountdownShowStopwatch || phase === "complete" || phase === "feedback" ? (
-            <span>{formatMs(elapsedMs)}</span>
-          ) : (
-            <span>Stopwatch hidden</span>
-          )}
-        </div>
-
         {phase === "countdown" ? <div className="countdown-number">{countdown}</div> : null}
 
         <div className="flash-cards deck-countdown-cards" aria-live="polite">
           {currentCards.map(card => (
             <PlayingCard key={card.id} card={card} faceUp />
           ))}
-        </div>
-
-        <div className="status-pill" role="status">
-          {status}
         </div>
 
         {phase === "complete" ? (
@@ -398,6 +384,19 @@ export function DeckCountdown() {
           </div>
         ) : null}
       </section>
+
+      <div className="deck-progress" aria-label="Deck countdown progress">
+        <span>{formatCards(cardsShown)} shown</span>
+        <strong>{progress}%</strong>
+        {settings.deckCountdownShowStopwatch || phase === "complete" || phase === "feedback" ? (
+          <span>{formatMs(elapsedMs)}</span>
+        ) : (
+          <span>Stopwatch hidden</span>
+        )}
+      </div>
+      <div className="deck-status" role="status">
+        {status}
+      </div>
 
       <nav className="controls deck-countdown-controls" aria-label="Deck countdown controls">
         {settings.deckCountdownFlipMode === "manual" ? (

@@ -140,7 +140,7 @@ export function DeckCountdown() {
     nextIndexRef.current = end;
     setCardsShown(end);
     setPhase("running");
-    setStatus(`${formatCards(end)} of ${formatCards(deckRef.current.length)} shown.`);
+    setStatus("Keep counting.");
     if (end >= deckRef.current.length) {
       finishRun();
       return true;
@@ -394,9 +394,11 @@ export function DeckCountdown() {
           <span>Stopwatch hidden</span>
         )}
       </div>
-      <div className="deck-status" role="status">
-        {status}
-      </div>
+      {phase !== "running" ? (
+        <div className="deck-status" role="status">
+          {status}
+        </div>
+      ) : null}
 
       <nav className="controls deck-countdown-controls" aria-label="Deck countdown controls">
         {settings.deckCountdownFlipMode === "manual" ? (

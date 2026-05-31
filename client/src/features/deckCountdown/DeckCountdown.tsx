@@ -64,7 +64,7 @@ export function DeckCountdown() {
   const [cardsShown, setCardsShown] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [countdown, setCountdown] = useState(3);
-  const [status, setStatus] = useState("Press Enter or Flip card to start.");
+  const [status, setStatus] = useState("Press Enter or Start to begin.");
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<{
     correct: boolean;
@@ -174,39 +174,49 @@ export function DeckCountdown() {
     setElapsedMs(0);
     setAnswer("");
     setFeedback(null);
-    setStatus("Press Enter or Flip card to start.");
+    setStatus("Press Enter or Start to begin.");
   }, [clearTimers]);
+
+  const startCountdownRun = useCallback(
+    (auto: boolean) => {
+      if (phase === "countdown" || phase === "running" || phase === "complete") return;
+      prepareRun();
+      let count = 3;
+      setCountdown(count);
+      setPhase("countdown");
+      setStatus("Get ready.");
+      countdownTimerRef.current = window.setInterval(() => {
+        count -= 1;
+        if (count > 0) {
+          setCountdown(count);
+          return;
+        }
+        if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+        const done = flipNextGroup();
+        if (auto && !done) {
+          autoTimerRef.current = window.setInterval(() => {
+            flipNextGroup();
+          }, clampDeckCountdownInterval(settings.deckCountdownAutoIntervalMs));
+        }
+      }, 1000);
+    },
+    [flipNextGroup, phase, prepareRun, settings.deckCountdownAutoIntervalMs]
+  );
 
   const flipManual = useCallback(() => {
     if (settings.deckCountdownFlipMode !== "manual") return;
-    if (phase === "complete" || phase === "countdown") return;
-    if (phase === "idle" || phase === "feedback") prepareRun();
-    flipNextGroup();
-  }, [flipNextGroup, phase, prepareRun, settings.deckCountdownFlipMode]);
+    if (phase === "idle" || phase === "feedback") {
+      startCountdownRun(false);
+      return;
+    }
+    if (phase === "running") flipNextGroup();
+  }, [flipNextGroup, phase, settings.deckCountdownFlipMode, startCountdownRun]);
 
   const startAuto = useCallback(() => {
-    if (phase === "countdown" || phase === "running") return;
-    prepareRun();
-    let count = 3;
-    setCountdown(count);
-    setPhase("countdown");
-    setStatus("Get ready.");
-    countdownTimerRef.current = window.setInterval(() => {
-      count -= 1;
-      if (count > 0) {
-        setCountdown(count);
-        return;
-      }
-      if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
-      countdownTimerRef.current = null;
-      const done = flipNextGroup();
-      if (!done) {
-        autoTimerRef.current = window.setInterval(() => {
-          flipNextGroup();
-        }, clampDeckCountdownInterval(settings.deckCountdownAutoIntervalMs));
-      }
-    }, 1000);
-  }, [flipNextGroup, phase, prepareRun, settings.deckCountdownAutoIntervalMs]);
+    if (settings.deckCountdownFlipMode !== "auto") return;
+    startCountdownRun(true);
+  }, [settings.deckCountdownFlipMode, startCountdownRun]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -215,7 +225,7 @@ export function DeckCountdown() {
       if (event.key !== "Enter") return;
       if (
         settings.deckCountdownFlipMode === "manual" &&
-        (phase === "idle" || phase === "running")
+        (phase === "idle" || phase === "running" || phase === "feedback")
       ) {
         event.preventDefault();
         flipManual();
@@ -413,7 +423,7 @@ export function DeckCountdown() {
             onClick={flipManual}
             disabled={phase === "countdown" || phase === "complete"}
           >
-            Flip card
+            {phase === "running" ? "Flip card" : "Start countdown"}
           </button>
         ) : (
           <button
@@ -433,8 +443,8 @@ export function DeckCountdown() {
       <TrackingControls className="tracking-bar" />
 
       <p className="shortcut-help">
-        Manual shortcut: Enter flips one group. A stopped run is discarded until you finish and
-        submit.
+        Enter starts the countdown. In manual mode, Enter flips one group after the first reveal. A
+        stopped run is discarded until you finish and submit.
       </p>
 
       <DeckCountdownAnalytics open={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />

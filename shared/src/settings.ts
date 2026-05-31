@@ -74,7 +74,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   flashDurationMs: 1500,
   deckCountdownDecks: 1,
   deckCountdownCardsPerFlip: 1,
-  deckCountdownFlipMode: "manual",
+  deckCountdownFlipMode: "auto",
   deckCountdownAutoIntervalMs: 1000,
   deckCountdownShowStopwatch: false
 };

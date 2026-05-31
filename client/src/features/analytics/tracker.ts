@@ -2,6 +2,7 @@ import type {
   AppSettings,
   CardObservedRequest,
   CountCheckSubmittedRequest,
+  DeckCountdownRoundSubmittedRequest,
   FlashRoundSubmittedRequest,
   HandCompletedRequest,
   ShoeEndedRequest
@@ -171,6 +172,20 @@ export function trackFlashRound(
     .then(sessionId => {
       if (!sessionId) return;
       return api.flashRoundSubmitted({ ...payload, sessionId });
+    })
+    .then(() => onRecorded?.())
+    .catch(() => {});
+}
+
+export function trackDeckCountdownRound(
+  payload: Omit<DeckCountdownRoundSubmittedRequest, "sessionId">,
+  onRecorded?: () => void
+): void {
+  if (!shouldTrack()) return;
+  ensureSession()
+    .then(sessionId => {
+      if (!sessionId) return;
+      return api.deckCountdownRoundSubmitted({ ...payload, sessionId });
     })
     .then(() => onRecorded?.())
     .catch(() => {});

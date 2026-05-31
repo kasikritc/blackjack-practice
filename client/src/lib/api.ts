@@ -5,8 +5,10 @@ import type {
   CardObservedRequest,
   CountCheckSubmittedRequest,
   CreateSessionRequest,
+  DeckCountdownRoundSubmittedRequest,
   CreateSessionResponse,
   CreatedResponse,
+  DeckCountdownSummary,
   FlashRoundSubmittedRequest,
   FlashSummary,
   HandCompletedRequest,
@@ -54,6 +56,10 @@ export const api = {
   flashRoundSubmitted: (payload: FlashRoundSubmittedRequest) =>
     request<CreatedResponse>("POST", "/api/events/flash-round-submitted", payload),
 
+  // Deck countdown events
+  deckCountdownRoundSubmitted: (payload: DeckCountdownRoundSubmittedRequest) =>
+    request<CreatedResponse>("POST", "/api/events/deck-countdown-round-submitted", payload),
+
   // Strategy
   strategyAttempt: (payload: StrategyAttemptRequest) =>
     request<CreatedResponse>("POST", "/api/events/strategy-attempt", payload),
@@ -98,7 +104,20 @@ export const api = {
       "GET",
       `/api/analytics/flash-sessions?limit=${limit}&range=${range}`
     ),
-  resetFlashAnalytics: () => request<{ ok: boolean }>("DELETE", "/api/analytics/flash")
+  resetFlashAnalytics: () => request<{ ok: boolean }>("DELETE", "/api/analytics/flash"),
+
+  // Analytics (deck countdown)
+  deckCountdownSummary: () =>
+    request<DeckCountdownSummary>("GET", "/api/analytics/deck-countdown-summary"),
+  deckCountdownTrends: (range: AnalyticsRange) =>
+    request<AnalyticsTrends>("GET", `/api/analytics/deck-countdown-trends?range=${range}`),
+  deckCountdownSessions: (limit: number, range: AnalyticsRange) =>
+    request<RecentSessionsResponse>(
+      "GET",
+      `/api/analytics/deck-countdown-sessions?limit=${limit}&range=${range}`
+    ),
+  resetDeckCountdownAnalytics: () =>
+    request<{ ok: boolean }>("DELETE", "/api/analytics/deck-countdown")
 };
 
 /** Best-effort POST that never throws — analytics must not break gameplay. */

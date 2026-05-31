@@ -43,6 +43,7 @@ export interface AppSettings {
   deckCountdownCardsPerFlip: number;
   deckCountdownFlipMode: DeckCountdownFlipMode;
   deckCountdownAutoIntervalMs: number;
+  deckCountdownAnimationsEnabled: boolean;
   deckCountdownShowStopwatch: boolean;
 }
 
@@ -76,5 +77,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   deckCountdownCardsPerFlip: 1,
   deckCountdownFlipMode: "auto",
   deckCountdownAutoIntervalMs: 1000,
+  deckCountdownAnimationsEnabled: false,
   deckCountdownShowStopwatch: false
 };

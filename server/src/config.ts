@@ -10,6 +10,10 @@ export const ROOT = path.resolve(__dirname, "..", "..");
 
 export const PORT = Number(process.env.PORT || 5173);
 
+const devClientPort = process.env.DEV_CLIENT_PORT ? Number(process.env.DEV_CLIENT_PORT) : null;
+export const DEV_CLIENT_PORT =
+  devClientPort && Number.isFinite(devClientPort) ? devClientPort : null;
+
 export const DATA_DIR = path.join(ROOT, "data");
 
 /** Defaults to data/blackjack.sqlite; override with BLACKJACK_DB_PATH (used by tests). */

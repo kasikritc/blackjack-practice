@@ -1421,8 +1421,6 @@ button:disabled {
 .deck-countdown-cards {
   min-height: calc(clamp(44px, 12vw, 72px) * 1.6);
   position: relative;
-  perspective: 1200px;
-  perspective-origin: center 30%;
 }
 .deck-current-cards,
 .deck-previous-cards {
@@ -1430,6 +1428,7 @@ button:disabled {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: center;
+  align-items: center;
 }
 .deck-current-cards {
   position: relative;
@@ -1439,94 +1438,64 @@ button:disabled {
   position: absolute;
   inset: 0;
   z-index: 1;
-  align-items: center;
   pointer-events: none;
 }
 .deck-previous-card {
   display: inline-grid;
 }
 .deck-previous-card .card {
-  box-shadow: none;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.24);
+  filter: brightness(0.96);
 }
 .deck-flip-card {
-  display: inline-grid;
   position: relative;
+  display: inline-flex;
+  perspective: 1200px;
+}
+/* The card flips around its VERTICAL axis (a left-right turn), so every
+   point keeps its y-coordinate. During the turn, the previous card layer
+   remains visible underneath like a physical discard pile. */
+.deck-flip-inner {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
   transform-style: preserve-3d;
-  animation: countdown-card-place 360ms cubic-bezier(0.16, 0.88, 0.22, 1) both;
-  animation-delay: calc(var(--flip-index, 0) * 42ms);
+  transform-origin: center center;
+  animation: countdown-flip 460ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--flip-index, 0) * 55ms);
 }
-.deck-flip-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 2;
+/* Both faces share one grid cell and stay locked together as the card
+   turns, so there is never an offset that exposes another layer. */
+.deck-flip-face {
+  grid-area: 1 / 1;
+  display: grid;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.deck-flip-front {
+  transform: rotateY(0deg);
+}
+.deck-flip-back {
+  transform: rotateY(180deg);
   border-radius: 7px;
+  border: 1px solid rgba(18, 24, 30, 0.2);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 42%),
-    repeating-linear-gradient(45deg, #23463f 0 6px, #17382f 6px 12px);
-  box-shadow: none;
-  transform-origin: center bottom;
-  backface-visibility: hidden;
-  animation: countdown-card-back 360ms cubic-bezier(0.16, 0.88, 0.22, 1) both;
-  animation-delay: calc(var(--flip-index, 0) * 42ms);
-  pointer-events: none;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 10px 10px,
+    linear-gradient(225deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 10px 10px,
+    #243a79;
 }
-.deck-flip-card .card {
-  border-color: rgba(18, 24, 30, 0.12);
-  box-shadow: none;
-  transform-origin: center bottom;
-  backface-visibility: hidden;
-  animation: countdown-card-face 360ms cubic-bezier(0.16, 0.88, 0.22, 1) both;
-  animation-delay: calc(var(--flip-index, 0) * 42ms);
-}
-.no-animation .deck-flip-card,
-.no-animation .deck-flip-card::before,
-.no-animation .deck-flip-card .card {
+.no-animation .deck-flip-inner {
   animation: none;
 }
-.no-animation .deck-flip-card::before {
+.no-animation .deck-flip-back {
   display: none;
 }
-@keyframes countdown-card-place {
+@keyframes countdown-flip {
   0% {
-    transform: translate3d(16px, 42px, 0) rotateZ(4deg) scale(0.98);
-  }
-  48% {
-    transform: translate3d(10px, -20px, 22px) rotateZ(2deg) scale(1);
+    transform: rotateY(180deg);
   }
   100% {
-    transform: translate3d(0, 0, 0) rotateZ(0deg) scale(1);
-  }
-}
-@keyframes countdown-card-back {
-  0% {
-    opacity: 1;
-    transform: rotateX(0deg) rotateZ(0deg);
-  }
-  45% {
-    opacity: 1;
-    transform: rotateX(-96deg) rotateZ(1deg);
-  }
-  46%,
-  100% {
-    opacity: 0;
-    transform: rotateX(-104deg) rotateZ(1deg);
-  }
-}
-@keyframes countdown-card-face {
-  0%,
-  44% {
-    opacity: 0;
-    transform: rotateX(112deg) rotateZ(-1deg);
-    filter: brightness(0.98);
-  }
-  45% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 1;
-    transform: rotateX(0deg) rotateZ(0deg);
-    filter: brightness(1);
+    transform: rotateY(0deg);
   }
 }
 .countdown-number {

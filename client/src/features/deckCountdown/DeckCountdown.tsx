@@ -25,6 +25,8 @@ import { DeckCountdownAnalytics } from "./DeckCountdownAnalytics";
 type Phase = "idle" | "countdown" | "running" | "complete" | "feedback";
 
 const DECK_CHOICES = [1, 2, 4, 6, 8];
+const FLIP_DURATION_MS = 460;
+const FLIP_STAGGER_MS = 55;
 
 function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -154,12 +156,16 @@ export function DeckCountdown() {
     const end = Math.min(deckRef.current.length, start + cardsPerFlip);
     const nextCards = deckRef.current.slice(start, end);
     if (previousCardsTimerRef.current) window.clearTimeout(previousCardsTimerRef.current);
-    setPreviousCards(currentCardsRef.current);
+    if (settings.animationsEnabled && settings.deckCountdownAnimationsEnabled) {
+      setPreviousCards(currentCardsRef.current);
+      previousCardsTimerRef.current = window.setTimeout(
+        () => setPreviousCards([]),
+        FLIP_DURATION_MS + Math.max(0, nextCards.length - 1) * FLIP_STAGGER_MS
+      );
+    } else {
+      setPreviousCards([]);
+    }
     setCurrentCards(nextCards);
-    previousCardsTimerRef.current = window.setTimeout(
-      () => setPreviousCards([]),
-      390 + Math.max(0, nextCards.length - 1) * 42
-    );
     nextIndexRef.current = end;
     setCardsShown(end);
     setPhase("running");
@@ -169,7 +175,13 @@ export function DeckCountdown() {
       return true;
     }
     return false;
-  }, [finishRun, settings.deckCountdownCardsPerFlip, startElapsedTimer]);
+  }, [
+    finishRun,
+    settings.animationsEnabled,
+    settings.deckCountdownAnimationsEnabled,
+    settings.deckCountdownCardsPerFlip,
+    startElapsedTimer
+  ]);
 
   const prepareRun = useCallback(() => {
     clearTimers();
@@ -305,10 +317,12 @@ export function DeckCountdown() {
   const active = phase === "countdown" || phase === "running" || phase === "complete";
   const totalCards = clampDeckCountdownDecks(settings.deckCountdownDecks) * 52;
   const progress = totalCards ? Math.round((cardsShown / totalCards) * 100) : 0;
+  const deckCountdownAnimationsEnabled =
+    settings.animationsEnabled && settings.deckCountdownAnimationsEnabled;
 
   return (
     <div
-      className={`drill deck-countdown-shell${settings.animationsEnabled ? "" : " no-animation"}`}
+      className={`drill deck-countdown-shell${deckCountdownAnimationsEnabled ? "" : " no-animation"}`}
       data-mode="deck-countdown"
     >
       <TopBar eyebrow="Deck Countdown" title="Deck Countdown">
@@ -383,6 +397,15 @@ export function DeckCountdown() {
         <label className="deck-checkbox">
           <input
             type="checkbox"
+            checked={settings.deckCountdownAnimationsEnabled}
+            disabled={active || !settings.animationsEnabled}
+            onChange={e => updateSettings({ deckCountdownAnimationsEnabled: e.target.checked })}
+          />
+          <span>Animate flips</span>
+        </label>
+        <label className="deck-checkbox">
+          <input
+            type="checkbox"
             checked={settings.deckCountdownShowStopwatch}
             disabled={active}
             onChange={e => updateSettings({ deckCountdownShowStopwatch: e.target.checked })}
@@ -411,7 +434,12 @@ export function DeckCountdown() {
                 key={card.id}
                 style={{ "--flip-index": index } as CSSProperties}
               >
-                <PlayingCard card={card} faceUp />
+                <span className="deck-flip-inner">
+                  <span className="deck-flip-face deck-flip-back" aria-hidden="true" />
+                  <span className="deck-flip-face deck-flip-front">
+                    <PlayingCard card={card} faceUp />
+                  </span>
+                </span>
               </span>
             ))}
           </div>

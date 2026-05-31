@@ -1421,6 +1421,7 @@ button:disabled {
 .deck-countdown-cards {
   min-height: calc(clamp(44px, 12vw, 72px) * 1.6);
   perspective: 900px;
+  perspective-origin: center 42%;
 }
 .deck-flip-card {
   display: inline-grid;
@@ -1435,17 +1436,19 @@ button:disabled {
   inset: 0;
   z-index: 2;
   border-radius: 7px;
-  border: 1px solid rgba(18, 24, 30, 0.25);
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.22), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 38%),
     repeating-linear-gradient(45deg, #23463f 0 6px, #17382f 6px 12px);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.34);
-  transform-origin: left center;
+  transform: translateZ(0.2px);
+  transform-origin: center top;
+  backface-visibility: hidden;
   animation: countdown-card-back 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
   animation-delay: calc(var(--flip-index, 0) * 42ms);
   pointer-events: none;
 }
 .deck-flip-card .card {
+  transform-origin: center top;
+  backface-visibility: hidden;
   animation: countdown-card-face 260ms cubic-bezier(0.2, 0.9, 0.2, 1.05) both;
   animation-delay: calc(var(--flip-index, 0) * 42ms);
 }
@@ -1459,35 +1462,37 @@ button:disabled {
 }
 @keyframes countdown-card-land {
   0% {
-    transform: translate3d(18px, -16px, 0) rotateZ(2deg) scale(0.96);
+    transform: translate3d(0, 14px, 0) scale(0.98);
   }
   100% {
-    transform: translate3d(0, 0, 0) rotateZ(0deg) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 @keyframes countdown-card-back {
   0% {
     opacity: 1;
-    transform: rotateY(0deg);
+    transform: translateZ(0.2px) rotateX(0deg);
   }
-  48% {
+  58% {
     opacity: 1;
-    transform: rotateY(-86deg);
+    transform: translateZ(0.2px) rotateX(84deg);
   }
-  49%,
+  59%,
   100% {
     opacity: 0;
-    transform: rotateY(-90deg);
+    transform: translateZ(0.2px) rotateX(88deg);
   }
 }
 @keyframes countdown-card-face {
   0%,
-  42% {
-    transform: rotateY(84deg);
-    filter: brightness(0.92);
+  46% {
+    opacity: 0.96;
+    transform: rotateX(-78deg);
+    filter: brightness(0.95);
   }
   100% {
-    transform: rotateY(0deg);
+    opacity: 1;
+    transform: rotateX(0deg);
     filter: brightness(1);
   }
 }

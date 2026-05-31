@@ -27,7 +27,6 @@ export function clampFlashCount(value: number | string): number {
   return Math.max(1, Math.min(8, n));
 }
 
-
 export function clampDeckCountdownDecks(value: number | string): number {
   const allowed = [1, 2, 4, 6, 8];
   const n = Math.round(Number(value));

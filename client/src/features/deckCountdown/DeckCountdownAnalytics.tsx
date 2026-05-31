@@ -157,7 +157,11 @@ export function DeckCountdownAnalytics({ open, onClose }: { open: boolean; onClo
                 value: formatMs(summary.medianResponse),
                 hint: "Typical completion time"
               },
-              { label: "Best clean time", value: formatMs(summary.bestTimeMs), hint: "Correct rounds only" }
+              {
+                label: "Best clean time",
+                value: formatMs(summary.bestTimeMs),
+                hint: "Correct rounds only"
+              }
             ]}
           />
           <MetricGroupSection
@@ -173,7 +177,11 @@ export function DeckCountdownAnalytics({ open, onClose }: { open: boolean; onClo
             tiles={[
               { label: "Rounds", value: summary.totals?.rounds || 0, hint: "Submitted drills" },
               { label: "Cards seen", value: summary.totals?.cards || 0, hint: "Across rounds" },
-              { label: "Average decks", value: formatNumber(summary.avgDecks), hint: "Decks per round" },
+              {
+                label: "Average decks",
+                value: formatNumber(summary.avgDecks),
+                hint: "Decks per round"
+              },
               { label: "Sessions", value: summary.totals?.sessions || 0, hint: "Tracked visits" }
             ]}
           />

@@ -66,9 +66,11 @@ export function DeckCountdown() {
   const [countdown, setCountdown] = useState(3);
   const [status, setStatus] = useState("Press Enter or Flip card to start.");
   const [answer, setAnswer] = useState("");
-  const [feedback, setFeedback] = useState<{ correct: boolean; value: number; elapsedMs: number } | null>(
-    null
-  );
+  const [feedback, setFeedback] = useState<{
+    correct: boolean;
+    value: number;
+    elapsedMs: number;
+  } | null>(null);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [stats, setStats] = useState<DeckCountdownSummary | null>(null);
 
@@ -211,7 +213,10 @@ export function DeckCountdown() {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (analyticsOpen || isTextEntry(event.target)) return;
       if (event.key !== "Enter") return;
-      if (settings.deckCountdownFlipMode === "manual" && (phase === "idle" || phase === "running")) {
+      if (
+        settings.deckCountdownFlipMode === "manual" &&
+        (phase === "idle" || phase === "running")
+      ) {
         event.preventDefault();
         flipManual();
       }
@@ -232,7 +237,9 @@ export function DeckCountdown() {
     const elapsed = finishedElapsedRef.current || elapsedMs;
     setFeedback({ correct, value, elapsedMs: elapsed });
     setPhase("feedback");
-    setStatus(correct ? "Correct. The final count is 0." : "Incorrect. A complete deck count ends at 0.");
+    setStatus(
+      correct ? "Correct. The final count is 0." : "Incorrect. A complete deck count ends at 0."
+    );
     trackDeckCountdownRound(
       {
         deckCount: clampDeckCountdownDecks(settings.deckCountdownDecks),
@@ -275,7 +282,9 @@ export function DeckCountdown() {
           <select
             value={settings.deckCountdownDecks}
             disabled={active}
-            onChange={e => updateSettings({ deckCountdownDecks: clampDeckCountdownDecks(e.target.value) })}
+            onChange={e =>
+              updateSettings({ deckCountdownDecks: clampDeckCountdownDecks(e.target.value) })
+            }
           >
             {DECK_CHOICES.map(choice => (
               <option value={choice} key={choice}>
@@ -306,7 +315,9 @@ export function DeckCountdown() {
             value={settings.deckCountdownFlipMode}
             disabled={active}
             onChange={e =>
-              updateSettings({ deckCountdownFlipMode: e.target.value as AppSettings["deckCountdownFlipMode"] })
+              updateSettings({
+                deckCountdownFlipMode: e.target.value as AppSettings["deckCountdownFlipMode"]
+              })
             }
           >
             <option value="manual">Manual</option>
@@ -381,7 +392,9 @@ export function DeckCountdown() {
         {feedback ? (
           <div className={`deck-feedback ${feedback.correct ? "correct" : "incorrect"}`}>
             <strong>{feedback.correct ? "Correct" : "Incorrect"}</strong>
-            <span>Submitted {signed(feedback.value)} · correct count 0 · {formatMs(feedback.elapsedMs)}</span>
+            <span>
+              Submitted {signed(feedback.value)} · correct count 0 · {formatMs(feedback.elapsedMs)}
+            </span>
           </div>
         ) : null}
       </section>
@@ -414,7 +427,8 @@ export function DeckCountdown() {
       <TrackingControls className="tracking-bar" />
 
       <p className="shortcut-help">
-        Manual shortcut: Enter flips one group. A stopped run is discarded until you finish and submit.
+        Manual shortcut: Enter flips one group. A stopped run is discarded until you finish and
+        submit.
       </p>
 
       <DeckCountdownAnalytics open={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />

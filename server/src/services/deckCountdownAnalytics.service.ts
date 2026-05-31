@@ -24,7 +24,10 @@ function deckCountdownMasteryScore(rows: any[]): number {
   const majorPenalty = Math.min(35, rows.filter(row => row.absolute_error >= 3).length * 7);
   return Math.max(
     0,
-    Math.min(100, Math.round(accuracyScore * 0.6 + errorScore * 0.25 + speedScore * 0.15 - majorPenalty))
+    Math.min(
+      100,
+      Math.round(accuracyScore * 0.6 + errorScore * 0.25 + speedScore * 0.15 - majorPenalty)
+    )
   );
 }
 
@@ -33,8 +36,12 @@ export function buildDeckCountdownSummary() {
   const recent = rounds.slice(-50);
   const correct = rounds.filter(row => row.correct === 1).length;
   const recentCorrect = recent.filter(row => row.correct === 1).length;
-  const sessions = firstValue("SELECT COUNT(DISTINCT session_id) AS value FROM deck_countdown_rounds");
-  const cards = firstValue("SELECT COALESCE(SUM(total_cards), 0) AS value FROM deck_countdown_rounds");
+  const sessions = firstValue(
+    "SELECT COUNT(DISTINCT session_id) AS value FROM deck_countdown_rounds"
+  );
+  const cards = firstValue(
+    "SELECT COALESCE(SUM(total_cards), 0) AS value FROM deck_countdown_rounds"
+  );
   const masteryScore = deckCountdownMasteryScore(recent.length ? recent : rounds);
   const successfulTimes = rounds
     .filter(row => row.correct === 1)
@@ -69,7 +76,10 @@ export function buildDeckCountdownSummary() {
       two: rounds.filter(row => row.absolute_error === 2).length,
       major: rounds.filter(row => row.absolute_error >= 3).length
     },
-    byDeckCount: groupedMetric(rounds, row => `${row.deck_count || 0} deck${Number(row.deck_count) === 1 ? "" : "s"}`),
+    byDeckCount: groupedMetric(
+      rounds,
+      row => `${row.deck_count || 0} deck${Number(row.deck_count) === 1 ? "" : "s"}`
+    ),
     byCardsPerFlip: groupedMetric(rounds, row => `${row.cards_per_flip || 0} cards/flip`),
     byFlipMode: groupedMetric(rounds, row => (row.flip_mode === "auto" ? "Automatic" : "Manual"))
   };

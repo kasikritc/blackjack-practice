@@ -219,11 +219,16 @@ export function DeckCountdown() {
       ) {
         event.preventDefault();
         flipManual();
+        return;
+      }
+      if (settings.deckCountdownFlipMode === "auto" && (phase === "idle" || phase === "feedback")) {
+        event.preventDefault();
+        startAuto();
       }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [analyticsOpen, flipManual, phase, settings.deckCountdownFlipMode]);
+  }, [analyticsOpen, flipManual, phase, settings.deckCountdownFlipMode, startAuto]);
 
   const updateSettings = (patch: Partial<AppSettings>) => setSettings({ ...settings, ...patch });
 

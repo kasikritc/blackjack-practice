@@ -1420,6 +1420,76 @@ button:disabled {
 }
 .deck-countdown-cards {
   min-height: calc(clamp(44px, 12vw, 72px) * 1.6);
+  perspective: 900px;
+}
+.deck-flip-card {
+  display: inline-grid;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: countdown-card-land 260ms cubic-bezier(0.2, 0.9, 0.2, 1.05) both;
+  animation-delay: calc(var(--flip-index, 0) * 42ms);
+}
+.deck-flip-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 7px;
+  border: 1px solid rgba(18, 24, 30, 0.25);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.22), transparent 42%),
+    repeating-linear-gradient(45deg, #23463f 0 6px, #17382f 6px 12px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.34);
+  transform-origin: left center;
+  animation: countdown-card-back 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  animation-delay: calc(var(--flip-index, 0) * 42ms);
+  pointer-events: none;
+}
+.deck-flip-card .card {
+  animation: countdown-card-face 260ms cubic-bezier(0.2, 0.9, 0.2, 1.05) both;
+  animation-delay: calc(var(--flip-index, 0) * 42ms);
+}
+.no-animation .deck-flip-card,
+.no-animation .deck-flip-card::before,
+.no-animation .deck-flip-card .card {
+  animation: none;
+}
+.no-animation .deck-flip-card::before {
+  display: none;
+}
+@keyframes countdown-card-land {
+  0% {
+    transform: translate3d(18px, -16px, 0) rotateZ(2deg) scale(0.96);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotateZ(0deg) scale(1);
+  }
+}
+@keyframes countdown-card-back {
+  0% {
+    opacity: 1;
+    transform: rotateY(0deg);
+  }
+  48% {
+    opacity: 1;
+    transform: rotateY(-86deg);
+  }
+  49%,
+  100% {
+    opacity: 0;
+    transform: rotateY(-90deg);
+  }
+}
+@keyframes countdown-card-face {
+  0%,
+  42% {
+    transform: rotateY(84deg);
+    filter: brightness(0.92);
+  }
+  100% {
+    transform: rotateY(0deg);
+    filter: brightness(1);
+  }
 }
 .countdown-number {
   display: grid;

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent
+} from "react";
 import type { AppSettings, DeckCountdownSummary } from "@blackjack/shared";
 import { PlayingCard } from "../../components/PlayingCard";
 import { TopBar } from "../../components/TopBar";
@@ -282,7 +289,10 @@ export function DeckCountdown() {
   const progress = totalCards ? Math.round((cardsShown / totalCards) * 100) : 0;
 
   return (
-    <div className="drill deck-countdown-shell" data-mode="deck-countdown">
+    <div
+      className={`drill deck-countdown-shell${settings.animationsEnabled ? "" : " no-animation"}`}
+      data-mode="deck-countdown"
+    >
       <TopBar eyebrow="Deck Countdown" title="Deck Countdown">
         <button type="button" className="ghost-button" onClick={() => setAnalyticsOpen(true)}>
           <span>Analytics</span>
@@ -367,8 +377,14 @@ export function DeckCountdown() {
         {phase === "countdown" ? <div className="countdown-number">{countdown}</div> : null}
 
         <div className="flash-cards deck-countdown-cards" aria-live="polite">
-          {currentCards.map(card => (
-            <PlayingCard key={card.id} card={card} faceUp />
+          {currentCards.map((card, index) => (
+            <span
+              className="deck-flip-card"
+              key={card.id}
+              style={{ "--flip-index": index } as CSSProperties}
+            >
+              <PlayingCard card={card} faceUp />
+            </span>
           ))}
         </div>
 

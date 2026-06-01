@@ -44,3 +44,9 @@ export function clampDeckCountdownInterval(value: number | string): number {
   if (!Number.isFinite(n)) return 1000;
   return Math.max(200, Math.min(3000, n));
 }
+
+export function clampDeckCountdownFlipDuration(value: number | string): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 180;
+  return Math.max(100, Math.min(300, n));
+}

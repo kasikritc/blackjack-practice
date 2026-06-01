@@ -1611,55 +1611,11 @@ button:disabled {
   font-size: 48px;
   font-weight: 900;
 }
-.deck-final-form {
-  width: min(100%, 360px);
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-  align-items: end;
-}
-.deck-final-form label {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-.deck-final-form input {
-  min-height: 44px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(0, 0, 0, 0.24);
-  color: var(--paper);
-  padding: 9px 10px;
-  font: inherit;
-}
-.deck-feedback {
-  display: grid;
-  gap: 3px;
-  text-align: center;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-.deck-feedback.correct strong {
-  color: var(--accent);
-}
-.deck-feedback.incorrect strong {
-  color: var(--danger);
-}
-.deck-feedback span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-}
 .deck-countdown-controls {
   grid-template-columns: 1fr 1fr;
 }
 @media (max-width: 620px) {
   .deck-progress,
-  .deck-final-form,
   .deck-countdown-controls {
     grid-template-columns: 1fr;
   }

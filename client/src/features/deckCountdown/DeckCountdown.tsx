@@ -1,12 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type FormEvent
-} from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { AppSettings, DeckCountdownSummary } from "@blackjack/shared";
+import { CountDialog } from "../../components/CountDialog";
 import { PlayingCard } from "../../components/PlayingCard";
 import { TopBar } from "../../components/TopBar";
 import { api } from "../../lib/api";
@@ -79,7 +73,6 @@ export function DeckCountdown() {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [countdown, setCountdown] = useState(3);
   const [status, setStatus] = useState("Press Enter or Start to begin.");
-  const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<{
     correct: boolean;
     value: number;
@@ -200,7 +193,6 @@ export function DeckCountdown() {
     setPreviousCards([]);
     setCardsShown(0);
     setElapsedMs(0);
-    setAnswer("");
     setFeedback(null);
   }, [clearTimers, settings.deckCountdownDecks]);
 
@@ -215,7 +207,6 @@ export function DeckCountdown() {
     setPreviousCards([]);
     setCardsShown(0);
     setElapsedMs(0);
-    setAnswer("");
     setFeedback(null);
     setStatus("Press Enter or Start to begin.");
   }, [clearTimers]);
@@ -268,13 +259,13 @@ export function DeckCountdown() {
       if (event.key !== "Enter") return;
       if (
         settings.deckCountdownFlipMode === "manual" &&
-        (phase === "idle" || phase === "running" || phase === "feedback")
+        (phase === "idle" || phase === "running")
       ) {
         event.preventDefault();
         flipManual();
         return;
       }
-      if (settings.deckCountdownFlipMode === "auto" && (phase === "idle" || phase === "feedback")) {
+      if (settings.deckCountdownFlipMode === "auto" && phase === "idle") {
         event.preventDefault();
         startAuto();
       }
@@ -285,10 +276,9 @@ export function DeckCountdown() {
 
   const updateSettings = (patch: Partial<AppSettings>) => setSettings({ ...settings, ...patch });
 
-  const submitFinalCount = (event: FormEvent) => {
-    event.preventDefault();
+  const submitFinalCount = (answer: number) => {
     if (phase !== "complete") return;
-    const value = Math.trunc(Number(answer));
+    const value = Math.trunc(answer);
     if (!Number.isFinite(value)) return;
     const signedError = value;
     const correct = value === 0;
@@ -319,6 +309,27 @@ export function DeckCountdown() {
       refreshStats
     );
   };
+
+  const continueFinalCount = () => {
+    setFeedback(null);
+    setPhase("idle");
+    setStatus("Press Enter or Start to begin.");
+  };
+
+  const finalCountFeedback = feedback ? (
+    <div className="count-feedback">
+      <div className="feedback-result">
+        <strong>{feedback.correct ? "Correct" : "Incorrect"}</strong>
+        <span>Correct count 0</span>
+      </div>
+      <div className="feedback-equation">
+        <span>Submitted</span>
+        <strong>{signed(feedback.value)}</strong>
+        <span>Elapsed</span>
+        <strong>{formatMs(feedback.elapsedMs)}</strong>
+      </div>
+    </div>
+  ) : null;
 
   const active = phase === "countdown" || phase === "running" || phase === "complete";
   const totalCards = clampDeckCountdownDecks(settings.deckCountdownDecks) * 52;
@@ -481,33 +492,6 @@ export function DeckCountdown() {
             ))}
           </div>
         </div>
-
-        {phase === "complete" ? (
-          <form className="deck-final-form" onSubmit={submitFinalCount}>
-            <label>
-              Ending count
-              <input
-                autoFocus
-                inputMode="numeric"
-                type="number"
-                value={answer}
-                onChange={e => setAnswer(e.target.value)}
-              />
-            </label>
-            <button type="submit" className="primary-button">
-              Submit
-            </button>
-          </form>
-        ) : null}
-
-        {feedback ? (
-          <div className={`deck-feedback ${feedback.correct ? "correct" : "incorrect"}`}>
-            <strong>{feedback.correct ? "Correct" : "Incorrect"}</strong>
-            <span>
-              Submitted {signed(feedback.value)} · correct count 0 · {formatMs(feedback.elapsedMs)}
-            </span>
-          </div>
-        ) : null}
       </section>
 
       <div className="deck-progress" aria-label="Deck countdown progress">
@@ -553,9 +537,21 @@ export function DeckCountdown() {
       <TrackingControls className="tracking-bar" />
 
       <p className="shortcut-help">
-        Enter starts the countdown. In manual mode, Enter flips one group after the first reveal. A
-        stopped run is discarded until you finish and submit.
+        Enter starts the countdown. In manual mode, Enter flips one group after the first reveal. In
+        the final-count prompt, D toggles sign and Enter submits.
       </p>
+
+      {phase === "complete" || phase === "feedback" ? (
+        <CountDialog
+          open
+          eyebrow="Deck countdown"
+          title="What is the final count?"
+          betweenRounds
+          feedback={feedback ? { correct: feedback.correct, content: finalCountFeedback } : null}
+          onSubmit={submitFinalCount}
+          onContinue={continueFinalCount}
+        />
+      ) : null}
 
       <DeckCountdownAnalytics open={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />
     </div>

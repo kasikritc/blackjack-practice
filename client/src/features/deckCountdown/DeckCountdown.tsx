@@ -17,13 +17,29 @@ import { TrackingControls } from "../analytics/AnalyticsShared";
 import { configureTracking, trackDeckCountdownRound } from "../analytics/tracker";
 import { DeckCountdownAnalytics } from "./DeckCountdownAnalytics";
 
-type Phase = "idle" | "countdown" | "running" | "complete" | "feedback";
+type Phase = "idle" | "countdown" | "running" | "finishing" | "complete" | "feedback";
 
 const DECK_CHOICES = [1, 2, 4, 6, 8];
 const DEFAULT_FLIP_DURATION_MS = 180;
+const MIN_FINAL_REVEAL_MS = 700;
+const FINAL_PROMPT_BUFFER_MS = 300;
 
 function flipStaggerMs(durationMs: number): number {
   return Math.max(18, Math.round(durationMs * 0.12));
+}
+
+function finalPromptDelayMs(
+  animationsEnabled: boolean,
+  deckCountdownAnimationsEnabled: boolean,
+  flipDurationMs: number,
+  cardCount: number
+): number {
+  if (!animationsEnabled || !deckCountdownAnimationsEnabled) return MIN_FINAL_REVEAL_MS;
+  const animatedMs =
+    flipDurationMs +
+    Math.max(0, cardCount - 1) * flipStaggerMs(flipDurationMs) +
+    FINAL_PROMPT_BUFFER_MS;
+  return Math.max(MIN_FINAL_REVEAL_MS, animatedMs);
 }
 
 function isTextEntry(target: EventTarget | null): boolean {
@@ -89,6 +105,7 @@ export function DeckCountdown() {
   const countdownTimerRef = useRef<number | null>(null);
   const elapsedTimerRef = useRef<number | null>(null);
   const previousCardsTimerRef = useRef<number | null>(null);
+  const finalPromptTimerRef = useRef<number | null>(null);
   const currentCardsRef = useRef<GameCard[]>([]);
 
   useEffect(() => {
@@ -115,10 +132,12 @@ export function DeckCountdown() {
     if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
     if (elapsedTimerRef.current) window.clearInterval(elapsedTimerRef.current);
     if (previousCardsTimerRef.current) window.clearTimeout(previousCardsTimerRef.current);
+    if (finalPromptTimerRef.current) window.clearTimeout(finalPromptTimerRef.current);
     autoTimerRef.current = null;
     countdownTimerRef.current = null;
     elapsedTimerRef.current = null;
     previousCardsTimerRef.current = null;
+    finalPromptTimerRef.current = null;
   }, []);
 
   useEffect(() => () => clearTimers(), [clearTimers]);
@@ -130,17 +149,34 @@ export function DeckCountdown() {
     }, 100);
   }, []);
 
-  const finishRun = useCallback(() => {
-    if (autoTimerRef.current) window.clearInterval(autoTimerRef.current);
-    autoTimerRef.current = null;
-    if (elapsedTimerRef.current) window.clearInterval(elapsedTimerRef.current);
-    elapsedTimerRef.current = null;
-    const elapsed = startedAtRef.current ? Date.now() - startedAtRef.current : 0;
-    finishedElapsedRef.current = elapsed;
-    setElapsedMs(elapsed);
-    setPhase("complete");
-    setStatus("Deck complete. Enter your ending count.");
-  }, []);
+  const finishRun = useCallback(
+    (finalGroupSize: number, flipDurationMs: number) => {
+      if (autoTimerRef.current) window.clearInterval(autoTimerRef.current);
+      autoTimerRef.current = null;
+      if (elapsedTimerRef.current) window.clearInterval(elapsedTimerRef.current);
+      elapsedTimerRef.current = null;
+      if (finalPromptTimerRef.current) window.clearTimeout(finalPromptTimerRef.current);
+      const elapsed = startedAtRef.current ? Date.now() - startedAtRef.current : 0;
+      finishedElapsedRef.current = elapsed;
+      setElapsedMs(elapsed);
+      setPhase("finishing");
+      setStatus("Deck complete. Count the final cards.");
+      finalPromptTimerRef.current = window.setTimeout(
+        () => {
+          finalPromptTimerRef.current = null;
+          setPhase("complete");
+          setStatus("Deck complete. Enter your ending count.");
+        },
+        finalPromptDelayMs(
+          settings.animationsEnabled,
+          settings.deckCountdownAnimationsEnabled,
+          flipDurationMs,
+          finalGroupSize
+        )
+      );
+    },
+    [settings.animationsEnabled, settings.deckCountdownAnimationsEnabled]
+  );
 
   const flipNextGroup = useCallback(() => {
     if (!deckRef.current.length) return true;
@@ -169,7 +205,7 @@ export function DeckCountdown() {
     setPhase("running");
     setStatus("Keep counting.");
     if (end >= deckRef.current.length) {
-      finishRun();
+      finishRun(nextCards.length, flipDurationMs);
       return true;
     }
     return false;
@@ -213,7 +249,13 @@ export function DeckCountdown() {
 
   const startCountdownRun = useCallback(
     (auto: boolean) => {
-      if (phase === "countdown" || phase === "running" || phase === "complete") return;
+      if (
+        phase === "countdown" ||
+        phase === "running" ||
+        phase === "finishing" ||
+        phase === "complete"
+      )
+        return;
       prepareRun();
       let count = 3;
       setCountdown(count);
@@ -331,7 +373,8 @@ export function DeckCountdown() {
     </div>
   ) : null;
 
-  const active = phase === "countdown" || phase === "running" || phase === "complete";
+  const active =
+    phase === "countdown" || phase === "running" || phase === "finishing" || phase === "complete";
   const totalCards = clampDeckCountdownDecks(settings.deckCountdownDecks) * 52;
   const progress = totalCards ? Math.round((cardsShown / totalCards) * 100) : 0;
   const deckCountdownAnimationsEnabled =
@@ -515,7 +558,7 @@ export function DeckCountdown() {
             type="button"
             className="primary-button"
             onClick={flipManual}
-            disabled={phase === "countdown" || phase === "complete"}
+            disabled={phase === "countdown" || phase === "finishing" || phase === "complete"}
           >
             {phase === "running" ? "Flip card" : "Start countdown"}
           </button>
@@ -524,7 +567,12 @@ export function DeckCountdown() {
             type="button"
             className="primary-button"
             onClick={startAuto}
-            disabled={phase === "countdown" || phase === "running" || phase === "complete"}
+            disabled={
+              phase === "countdown" ||
+              phase === "running" ||
+              phase === "finishing" ||
+              phase === "complete"
+            }
           >
             Start auto
           </button>

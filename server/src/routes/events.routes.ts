@@ -186,6 +186,7 @@ eventsRouter.post("/events/deck-countdown-round-submitted", (req, res) => {
     session_id: body.sessionId,
     deck_count: body.deckCount,
     total_cards: body.totalCards,
+    omitted_card_count: body.omittedCardCount,
     cards_per_flip: body.cardsPerFlip,
     flip_mode: body.flipMode,
     auto_interval_ms: body.autoIntervalMs,

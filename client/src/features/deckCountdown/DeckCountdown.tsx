@@ -9,9 +9,10 @@ import {
   clampDeckCountdownCardsPerFlip,
   clampDeckCountdownDecks,
   clampDeckCountdownFlipDuration,
-  clampDeckCountdownInterval
+  clampDeckCountdownInterval,
+  clampDeckCountdownOmittedCards
 } from "../../lib/settings";
-import { makeShoe, signed, type GameCard } from "../../lib/cards";
+import { getHiLoValue, makeShoe, signed, type GameCard } from "../../lib/cards";
 import { useSettings } from "../../lib/useSettings";
 import { TrackingControls } from "../analytics/AnalyticsShared";
 import { configureTracking, trackDeckCountdownRound } from "../analytics/tracker";
@@ -85,6 +86,8 @@ export function DeckCountdown() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [currentCards, setCurrentCards] = useState<GameCard[]>([]);
   const [previousCards, setPreviousCards] = useState<GameCard[]>([]);
+  const [omittedCards, setOmittedCards] = useState<GameCard[]>([]);
+  const [expectedCount, setExpectedCount] = useState(0);
   const [cardsShown, setCardsShown] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [countdown, setCountdown] = useState(3);
@@ -92,7 +95,9 @@ export function DeckCountdown() {
   const [feedback, setFeedback] = useState<{
     correct: boolean;
     value: number;
+    expectedCount: number;
     elapsedMs: number;
+    omittedCards: GameCard[];
   } | null>(null);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [stats, setStats] = useState<DeckCountdownSummary | null>(null);
@@ -221,7 +226,13 @@ export function DeckCountdown() {
   const prepareRun = useCallback(() => {
     clearTimers();
     const deckCount = clampDeckCountdownDecks(settings.deckCountdownDecks);
-    deckRef.current = makeCountdownDeck(deckCount);
+    const omittedCardCount = clampDeckCountdownOmittedCards(settings.deckCountdownOmittedCards);
+    const fullDeck = makeCountdownDeck(deckCount);
+    const runOmittedCards = fullDeck.slice(0, omittedCardCount);
+    const countdownDeck = fullDeck.slice(omittedCardCount);
+    deckRef.current = countdownDeck;
+    setOmittedCards(runOmittedCards);
+    setExpectedCount(countdownDeck.reduce((sum, card) => sum + getHiLoValue(card), 0));
     nextIndexRef.current = 0;
     startedAtRef.current = null;
     finishedElapsedRef.current = 0;
@@ -230,7 +241,7 @@ export function DeckCountdown() {
     setCardsShown(0);
     setElapsedMs(0);
     setFeedback(null);
-  }, [clearTimers, settings.deckCountdownDecks]);
+  }, [clearTimers, settings.deckCountdownDecks, settings.deckCountdownOmittedCards]);
 
   const resetRun = useCallback(() => {
     clearTimers();
@@ -241,6 +252,8 @@ export function DeckCountdown() {
     setPhase("idle");
     setCurrentCards([]);
     setPreviousCards([]);
+    setOmittedCards([]);
+    setExpectedCount(0);
     setCardsShown(0);
     setElapsedMs(0);
     setFeedback(null);
@@ -322,18 +335,28 @@ export function DeckCountdown() {
     if (phase !== "complete") return;
     const value = Math.trunc(answer);
     if (!Number.isFinite(value)) return;
-    const signedError = value;
-    const correct = value === 0;
+    const signedError = value - expectedCount;
+    const correct = signedError === 0;
     const elapsed = finishedElapsedRef.current || elapsedMs;
-    setFeedback({ correct, value, elapsedMs: elapsed });
+    const runOmittedCards = omittedCards;
+    setFeedback({
+      correct,
+      value,
+      expectedCount,
+      elapsedMs: elapsed,
+      omittedCards: runOmittedCards
+    });
     setPhase("feedback");
     setStatus(
-      correct ? "Correct. The final count is 0." : "Incorrect. A complete deck count ends at 0."
+      correct
+        ? "Correct. The final count is " + signed(expectedCount) + "."
+        : "Incorrect. The final count is " + signed(expectedCount) + "."
     );
     trackDeckCountdownRound(
       {
         deckCount: clampDeckCountdownDecks(settings.deckCountdownDecks),
         totalCards: deckRef.current.length,
+        omittedCardCount: runOmittedCards.length,
         cardsPerFlip: clampDeckCountdownCardsPerFlip(settings.deckCountdownCardsPerFlip),
         flipMode: settings.deckCountdownFlipMode,
         autoIntervalMs:
@@ -341,7 +364,7 @@ export function DeckCountdown() {
             ? clampDeckCountdownInterval(settings.deckCountdownAutoIntervalMs)
             : undefined,
         stopwatchShown: settings.deckCountdownShowStopwatch,
-        correctCount: 0,
+        correctCount: expectedCount,
         userAnswer: value,
         signedError,
         absoluteError: Math.abs(signedError),
@@ -359,23 +382,44 @@ export function DeckCountdown() {
   };
 
   const finalCountFeedback = feedback ? (
-    <div className="count-feedback">
+    <div className="count-feedback deck-countdown-feedback">
       <div className="feedback-result">
         <strong>{feedback.correct ? "Correct" : "Incorrect"}</strong>
-        <span>Correct count 0</span>
+        <span>Expected {signed(feedback.expectedCount)}</span>
       </div>
       <div className="feedback-equation">
         <span>Submitted</span>
         <strong>{signed(feedback.value)}</strong>
+        <span>Expected</span>
+        <strong>{signed(feedback.expectedCount)}</strong>
         <span>Elapsed</span>
         <strong>{formatMs(feedback.elapsedMs)}</strong>
+      </div>
+      <div className="omitted-cards-review">
+        <span className="omitted-cards-title">Omitted cards</span>
+        {feedback.omittedCards.length ? (
+          <div className="omitted-card-list">
+            {feedback.omittedCards.map(card => (
+              <span className="omitted-card-item" key={card.id}>
+                <PlayingCard card={card} faceUp />
+                <strong>{signed(getHiLoValue(card))}</strong>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="omitted-card-empty">No cards omitted</p>
+        )}
       </div>
     </div>
   ) : null;
 
   const active =
     phase === "countdown" || phase === "running" || phase === "finishing" || phase === "complete";
-  const totalCards = clampDeckCountdownDecks(settings.deckCountdownDecks) * 52;
+  const totalCards = Math.max(
+    0,
+    clampDeckCountdownDecks(settings.deckCountdownDecks) * 52 -
+      clampDeckCountdownOmittedCards(settings.deckCountdownOmittedCards)
+  );
   const progress = totalCards ? Math.round((cardsShown / totalCards) * 100) : 0;
   const deckCountdownAnimationsEnabled =
     settings.animationsEnabled && settings.deckCountdownAnimationsEnabled;
@@ -413,6 +457,22 @@ export function DeckCountdown() {
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          Omitted cards
+          <input
+            type="number"
+            min={0}
+            max={5}
+            disabled={active}
+            value={settings.deckCountdownOmittedCards}
+            onChange={e => updateSettings({ deckCountdownOmittedCards: Number(e.target.value) })}
+            onBlur={e =>
+              updateSettings({
+                deckCountdownOmittedCards: clampDeckCountdownOmittedCards(e.target.value)
+              })
+            }
+          />
         </label>
         <label>
           Cards per flip

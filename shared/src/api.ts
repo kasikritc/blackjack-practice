@@ -113,6 +113,7 @@ export interface DeckCountdownRoundSubmittedRequest {
   sessionId: number;
   deckCount?: number;
   totalCards?: number;
+  omittedCardCount?: number;
   cardsPerFlip?: number;
   flipMode?: string;
   autoIntervalMs?: number;

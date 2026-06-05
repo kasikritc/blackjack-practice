@@ -714,6 +714,42 @@ button:disabled {
   color: var(--muted);
 }
 
+.omitted-cards-review {
+  display: grid;
+  gap: 0.5rem;
+}
+.omitted-cards-title {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.omitted-card-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.omitted-card-item {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+}
+.omitted-card-item .card {
+  transform: scale(0.72);
+  transform-origin: top center;
+  margin-bottom: -18px;
+}
+.omitted-card-item strong {
+  color: var(--paper);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+.omitted-card-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 /* ---------- Drawer ---------- */
 .drawer {
   position: fixed;
@@ -1356,8 +1392,8 @@ button:disabled {
 .deck-config {
   display: grid;
   grid-template-columns:
-    minmax(68px, 0.55fr) minmax(102px, 0.75fr) minmax(112px, 0.8fr)
-    minmax(140px, 1.1fr) minmax(132px, 1fr) minmax(280px, 2fr);
+    minmax(68px, 0.5fr) minmax(110px, 0.7fr) minmax(102px, 0.7fr)
+    minmax(112px, 0.75fr) minmax(140px, 1fr) minmax(132px, 1fr) minmax(250px, 1.8fr);
   align-items: end;
   gap: 10px;
   padding: 12px;

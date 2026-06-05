@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS deck_countdown_rounds (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deck_count INTEGER,
   total_cards INTEGER,
+  omitted_card_count INTEGER,
   cards_per_flip INTEGER,
   flip_mode TEXT,
   auto_interval_ms INTEGER,
@@ -248,6 +249,7 @@ function ensureSchemaColumns(): void {
   }
   ensureColumn("strategy_subsets", "is_default", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("strategy_attempts", "hand_number", "INTEGER");
+  ensureColumn("deck_countdown_rounds", "omitted_card_count", "INTEGER");
 }
 
 export function cleanupEmptySessions(): void {

@@ -39,6 +39,12 @@ export function clampDeckCountdownCardsPerFlip(value: number | string): number {
   return Math.max(1, Math.min(8, n));
 }
 
+export function clampDeckCountdownOmittedCards(value: number | string): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(5, n));
+}
+
 export function clampDeckCountdownInterval(value: number | string): number {
   const n = Math.round(Number(value));
   if (!Number.isFinite(n)) return 1000;

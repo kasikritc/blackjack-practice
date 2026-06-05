@@ -40,6 +40,7 @@ export interface AppSettings {
   flashMaxCards: number;
   flashDurationMs: number;
   deckCountdownDecks: number;
+  deckCountdownOmittedCards: number;
   deckCountdownCardsPerFlip: number;
   deckCountdownFlipMode: DeckCountdownFlipMode;
   deckCountdownAutoIntervalMs: number;
@@ -75,6 +76,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   flashMaxCards: 5,
   flashDurationMs: 1500,
   deckCountdownDecks: 1,
+  deckCountdownOmittedCards: 0,
   deckCountdownCardsPerFlip: 1,
   deckCountdownFlipMode: "auto",
   deckCountdownAutoIntervalMs: 1000,

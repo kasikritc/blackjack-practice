@@ -3,7 +3,8 @@ import type {
   AnalyticsRange,
   AnalyticsTrends,
   DeckCountdownSummary,
-  SessionRow
+  SessionRow,
+  TrendDay
 } from "@blackjack/shared";
 import { Drawer } from "../../components/Drawer";
 import { api } from "../../lib/api";
@@ -14,7 +15,6 @@ import {
   MetricGroupSection,
   RangeSelect,
   SessionsList,
-  TrendChart,
   type BreakdownFamilyData,
   type BreakdownRowData
 } from "../analytics/AnalyticsShared";
@@ -48,6 +48,82 @@ function breakdownFamilies(summary: DeckCountdownSummary): BreakdownFamilyData[]
       ]
     }
   ];
+}
+
+function CleanTimePerDeckChart({ days }: { days: TrendDay[] }) {
+  const cleanDays = days
+    .filter(
+      (day): day is TrendDay & { cleanTimePerDeckMs: number } =>
+        Number.isFinite(Number(day.cleanTimePerDeckMs)) && Number(day.cleanTimePerDeckMs) > 0
+    )
+    .slice(-18);
+  if (!cleanDays.length) {
+    return <p className="empty-state">No 100%-accurate runs in this range.</p>;
+  }
+
+  const width = 640;
+  const height = 220;
+  const margin = { top: 18, right: 16, bottom: 38, left: 58 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const values = cleanDays.map(day => day.cleanTimePerDeckMs);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const padding = Math.max(1000, (rawMax - rawMin) * 0.12);
+  const minValue = Math.max(0, rawMin - padding);
+  const maxValue = rawMax + padding;
+  const valueRange = Math.max(1, maxValue - minValue);
+  const xAt = (index: number) =>
+    cleanDays.length === 1
+      ? margin.left + plotWidth / 2
+      : margin.left + (index / (cleanDays.length - 1)) * plotWidth;
+  const yAt = (value: number) => margin.top + ((maxValue - value) / valueRange) * plotHeight;
+  const linePoints = cleanDays
+    .map((day, index) => `${xAt(index)},${yAt(day.cleanTimePerDeckMs)}`)
+    .join(" ");
+  const ticks = Array.from({ length: 4 }, (_, index) => maxValue - (valueRange * index) / 3);
+  const labelEvery = Math.max(1, Math.ceil(cleanDays.length / 6));
+
+  return (
+    <div className="clean-time-chart">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="Average clean time per deck by day"
+      >
+        {ticks.map(value => {
+          const y = yAt(value);
+          return (
+            <g className="clean-time-grid" key={value}>
+              <line x1={margin.left} x2={width - margin.right} y1={y} y2={y} />
+              <text x={margin.left - 8} y={y + 4} textAnchor="end">
+                {formatMs(value)}
+              </text>
+            </g>
+          );
+        })}
+        <polyline className="clean-time-line" points={linePoints} />
+        {cleanDays.map((day, index) => {
+          const x = xAt(index);
+          const y = yAt(day.cleanTimePerDeckMs);
+          const showLabel =
+            index === 0 || index === cleanDays.length - 1 || index % labelEvery === 0;
+          return (
+            <g className="clean-time-point" key={day.day}>
+              <circle cx={x} cy={y} r="4">
+                <title>{`${day.day}: ${formatMs(day.cleanTimePerDeckMs)} per deck (${day.checks} clean ${day.checks === 1 ? "run" : "runs"})`}</title>
+              </circle>
+              {showLabel ? (
+                <text x={x} y={margin.top + plotHeight + 24} textAnchor="middle">
+                  {day.day.slice(5)}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
 }
 
 export function DeckCountdownAnalytics({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -197,7 +273,11 @@ export function DeckCountdownAnalytics({ open, onClose }: { open: boolean; onClo
               <h3>Progress</h3>
               <RangeSelect value={trendRange} onChange={setTrendRange} options={TREND_OPTIONS} />
             </div>
-            <TrendChart days={trends?.days ?? []} />
+            <div className="clean-time-heading">
+              <strong>Average clean time per deck</strong>
+              <span>Daily average from 100%-accurate runs. Lower is better.</span>
+            </div>
+            <CleanTimePerDeckChart days={trends?.days ?? []} />
           </section>
 
           <section className="analytics-section" aria-label="Performance breakdowns">

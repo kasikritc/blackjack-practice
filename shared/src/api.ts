@@ -212,6 +212,7 @@ export interface TrendDay {
   accuracy: number;
   avgError: number;
   medianResponse: number;
+  cleanTimePerDeckMs?: number;
 }
 
 export interface AnalyticsTrends {

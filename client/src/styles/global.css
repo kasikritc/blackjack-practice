@@ -1169,6 +1169,53 @@ button:disabled {
   font-size: 13px;
   color: rgba(244, 238, 222, 0.92);
 }
+.clean-time-heading {
+  display: grid;
+  gap: 3px;
+}
+.clean-time-heading strong {
+  color: var(--paper);
+  font-size: 13px;
+}
+.clean-time-heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.clean-time-chart {
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.clean-time-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 180px;
+}
+.clean-time-grid line {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+.clean-time-grid text,
+.clean-time-point text {
+  fill: rgba(184, 197, 191, 0.78);
+  font-size: 10px;
+}
+.clean-time-line {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.clean-time-point circle {
+  fill: var(--accent);
+  stroke: var(--cream);
+  stroke-width: 2;
+}
+
 .trend-chart {
   min-height: 150px;
   display: flex;

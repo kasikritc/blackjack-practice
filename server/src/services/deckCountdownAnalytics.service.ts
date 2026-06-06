@@ -87,7 +87,7 @@ export function buildDeckCountdownSummary() {
 
 export function buildDeckCountdownTrends(range: string) {
   const rows = queryAll(
-    "SELECT date(created_at) AS day, correct, absolute_error, response_time_ms FROM deck_countdown_rounds ORDER BY created_at ASC"
+    "SELECT date(created_at) AS day, correct, absolute_error, response_time_ms, deck_count FROM deck_countdown_rounds ORDER BY created_at ASC"
   );
   const cutoff = range === "7d" ? 7 : range === "30d" ? 30 : null;
   const now = Date.now();
@@ -100,19 +100,28 @@ export function buildDeckCountdownTrends(range: string) {
     bucket.push(row);
     byDay.set(row.day, bucket);
   }
-  return {
-    range,
-    days: [...byDay.entries()].map(([day, dayRounds]) => ({
-      day,
-      checks: dayRounds.length,
-      accuracy: percent(dayRounds.filter(row => row.correct === 1).length, dayRounds.length),
-      avgError: average(dayRounds.map(row => row.absolute_error)),
-      medianResponse: percentile(
-        dayRounds.map(row => row.response_time_ms),
-        0.5
-      )
-    }))
-  };
+  const days = [...byDay.entries()].flatMap(([day, dayRounds]) => {
+    const cleanPaces = dayRounds
+      .filter(row => row.correct === 1)
+      .map(row => {
+        const decks = Math.max(1, Number(row.deck_count) || 1);
+        const responseTimeMs = Number(row.response_time_ms);
+        return responseTimeMs > 0 ? responseTimeMs / decks : Number.NaN;
+      })
+      .filter(Number.isFinite);
+    if (!cleanPaces.length) return [];
+    return [
+      {
+        day,
+        checks: cleanPaces.length,
+        accuracy: 100,
+        avgError: 0,
+        medianResponse: percentile(cleanPaces, 0.5),
+        cleanTimePerDeckMs: average(cleanPaces)
+      }
+    ];
+  });
+  return { range, days };
 }
 
 export function deckCountdownRecentSessions(limit = 10, sinceIso: string | null = null) {

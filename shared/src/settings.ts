@@ -11,6 +11,7 @@ export type DealerSpeed =
   | "manual"
   | "custom";
 export type CountCheckMode = "everyRound" | "everyNCards" | "random" | "manual";
+export type DeckCountdownFlipMode = "manual" | "auto";
 
 export interface AppSettings {
   numberOfDecks: number;
@@ -38,6 +39,14 @@ export interface AppSettings {
   flashMinCards: number;
   flashMaxCards: number;
   flashDurationMs: number;
+  deckCountdownDecks: number;
+  deckCountdownOmittedCards: number;
+  deckCountdownCardsPerFlip: number;
+  deckCountdownFlipMode: DeckCountdownFlipMode;
+  deckCountdownAutoIntervalMs: number;
+  deckCountdownAnimationsEnabled: boolean;
+  deckCountdownFlipDurationMs: number;
+  deckCountdownShowStopwatch: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -65,5 +74,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   animationsEnabled: true,
   flashMinCards: 2,
   flashMaxCards: 5,
-  flashDurationMs: 1500
+  flashDurationMs: 1500,
+  deckCountdownDecks: 1,
+  deckCountdownOmittedCards: 0,
+  deckCountdownCardsPerFlip: 1,
+  deckCountdownFlipMode: "auto",
+  deckCountdownAutoIntervalMs: 1000,
+  deckCountdownAnimationsEnabled: false,
+  deckCountdownFlipDurationMs: 180,
+  deckCountdownShowStopwatch: false
 };

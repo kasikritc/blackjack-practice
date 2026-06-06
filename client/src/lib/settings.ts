@@ -26,3 +26,33 @@ export function clampFlashCount(value: number | string): number {
   if (!Number.isFinite(n)) return 2;
   return Math.max(1, Math.min(8, n));
 }
+
+export function clampDeckCountdownDecks(value: number | string): number {
+  const allowed = [1, 2, 4, 6, 8];
+  const n = Math.round(Number(value));
+  return allowed.includes(n) ? n : 1;
+}
+
+export function clampDeckCountdownCardsPerFlip(value: number | string): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(1, Math.min(8, n));
+}
+
+export function clampDeckCountdownOmittedCards(value: number | string): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(5, n));
+}
+
+export function clampDeckCountdownInterval(value: number | string): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 1000;
+  return Math.max(200, Math.min(3000, n));
+}
+
+export function clampDeckCountdownFlipDuration(value: number | string): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 180;
+  return Math.max(100, Math.min(300, n));
+}

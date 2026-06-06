@@ -157,6 +157,25 @@ CREATE TABLE IF NOT EXISTS flash_round_cards (
   FOREIGN KEY (flash_round_id) REFERENCES flash_rounds(id),
   FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
+CREATE TABLE IF NOT EXISTS deck_countdown_rounds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id INTEGER,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deck_count INTEGER,
+  total_cards INTEGER,
+  omitted_card_count INTEGER,
+  cards_per_flip INTEGER,
+  flip_mode TEXT,
+  auto_interval_ms INTEGER,
+  stopwatch_shown INTEGER,
+  correct_count INTEGER,
+  user_answer INTEGER,
+  signed_error INTEGER,
+  absolute_error INTEGER,
+  correct INTEGER,
+  response_time_ms INTEGER,
+  FOREIGN KEY (session_id) REFERENCES sessions(id)
+);
 CREATE TABLE IF NOT EXISTS strategy_rule_profiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -230,6 +249,7 @@ function ensureSchemaColumns(): void {
   }
   ensureColumn("strategy_subsets", "is_default", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("strategy_attempts", "hand_number", "INTEGER");
+  ensureColumn("deck_countdown_rounds", "omitted_card_count", "INTEGER");
 }
 
 export function cleanupEmptySessions(): void {
@@ -238,6 +258,7 @@ export function cleanupEmptySessions(): void {
     AND NOT EXISTS (SELECT 1 FROM count_checks cc WHERE cc.session_id = sessions.id)
     AND NOT EXISTS (SELECT 1 FROM hands h WHERE h.session_id = sessions.id)
     AND NOT EXISTS (SELECT 1 FROM flash_rounds fr WHERE fr.session_id = sessions.id)
+    AND NOT EXISTS (SELECT 1 FROM deck_countdown_rounds dcr WHERE dcr.session_id = sessions.id)
   `;
   runSql(`
     DELETE FROM shoes

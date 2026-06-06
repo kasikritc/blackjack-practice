@@ -286,7 +286,7 @@ button:disabled {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 8px 9px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -512,6 +512,39 @@ button:disabled {
 .card:last-child .pip,
 .card:last-child .bottom-rank {
   visibility: visible;
+}
+.table-dealer-hand {
+  position: relative;
+  width: 100%;
+  min-height: max(72px, calc(clamp(52px, 12vw, 70px) * 1.4));
+  overflow: visible;
+}
+.dealer-card-slot {
+  position: absolute;
+  top: 0;
+  transition:
+    left 0.16s ease,
+    width 0.16s ease;
+}
+.dealer-card-slot .card {
+  --card-width: var(--dealer-render-width);
+  --card-padding: clamp(2px, calc(var(--dealer-render-width) * 0.07), 5px);
+  --rank-size: clamp(8px, calc(var(--dealer-render-width) * 0.22), 16px);
+  --pip-size: clamp(12px, calc(var(--dealer-render-width) * 0.38), 28px);
+  --corner-width: clamp(12px, calc(var(--dealer-render-width) * 0.31), 22px);
+  width: 100%;
+  margin-left: 0;
+}
+.dealer-card-slot .card .pip,
+.dealer-card-slot .card .bottom-rank {
+  visibility: visible;
+}
+.dealer-card-slot.is-hole {
+  z-index: 1;
+}
+.dealer-card-slot.is-upcard,
+.dealer-card-slot.is-hit {
+  z-index: 2;
 }
 
 /* ---------- Shoe boxes ---------- */
@@ -1136,6 +1169,53 @@ button:disabled {
   font-size: 13px;
   color: rgba(244, 238, 222, 0.92);
 }
+.clean-time-heading {
+  display: grid;
+  gap: 3px;
+}
+.clean-time-heading strong {
+  color: var(--paper);
+  font-size: 13px;
+}
+.clean-time-heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.clean-time-chart {
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.clean-time-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 180px;
+}
+.clean-time-grid line {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+.clean-time-grid text,
+.clean-time-point text {
+  fill: rgba(184, 197, 191, 0.78);
+  font-size: 10px;
+}
+.clean-time-line {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.clean-time-point circle {
+  fill: var(--accent);
+  stroke: var(--cream);
+  stroke-width: 2;
+}
+
 .trend-chart {
   min-height: 150px;
   display: flex;
@@ -1350,6 +1430,279 @@ button:disabled {
 .flash-stat small {
   color: var(--muted);
   font-size: 11px;
+}
+
+/* ---------- Deck Countdown ---------- */
+.deck-config {
+  display: grid;
+  grid-template-columns:
+    minmax(68px, 0.5fr) minmax(110px, 0.7fr) minmax(102px, 0.7fr)
+    minmax(112px, 0.75fr) minmax(140px, 1fr) minmax(132px, 1fr) minmax(250px, 1.8fr);
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.06);
+}
+.deck-config label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.deck-config select,
+.deck-config input {
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--paper);
+  padding: 8px 10px;
+}
+.deck-config input[type="range"] {
+  padding: 0;
+}
+.deck-range-control,
+.deck-toggle-group {
+  grid-column: auto;
+}
+.deck-toggle-group {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: end;
+  gap: 8px;
+}
+.deck-checkbox {
+  grid-template-columns: auto 1fr;
+  align-content: end;
+  align-items: center;
+  min-height: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.14);
+}
+.deck-checkbox input {
+  min-height: 0;
+}
+.deck-checkbox span {
+  white-space: nowrap;
+}
+@media (max-width: 1100px) {
+  .deck-config {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .deck-range-control,
+  .deck-toggle-group {
+    grid-column: span 2;
+  }
+}
+@media (max-width: 560px) {
+  .deck-config {
+    grid-template-columns: 1fr;
+  }
+  .deck-range-control,
+  .deck-toggle-group {
+    grid-column: span 1;
+  }
+}
+.deck-countdown-stage {
+  min-height: 46vh;
+}
+.deck-progress {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 2px 0;
+  color: rgba(184, 197, 191, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+}
+.deck-progress strong {
+  color: rgba(217, 180, 90, 0.78);
+  font-size: 14px;
+}
+.deck-progress span:last-child {
+  text-align: right;
+}
+.deck-status {
+  margin: -8px 2px 0;
+  color: rgba(184, 197, 191, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+.deck-countdown-cards {
+  min-height: calc(clamp(44px, 12vw, 72px) * 1.6);
+  position: relative;
+}
+.deck-current-cards,
+.deck-previous-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+}
+.deck-current-cards {
+  position: relative;
+  z-index: 2;
+}
+.deck-previous-cards {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.deck-previous-card {
+  display: inline-grid;
+}
+.deck-previous-card .card {
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.24);
+  filter: brightness(0.96);
+}
+.deck-flip-card {
+  --card-width: clamp(44px, 12vw, 72px);
+  position: relative;
+  display: inline-flex;
+  perspective: 1200px;
+}
+/* The incoming card starts below the pile with its patterned back visible,
+   then hinges over its bottom edge and lands face-up on the previous cards. */
+.deck-flip-inner {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  transform-style: preserve-3d;
+  transform-origin: bottom center;
+  animation: countdown-flip var(--flip-duration-ms, 180ms) cubic-bezier(0.22, 0.72, 0.28, 1) both;
+  animation-delay: calc(var(--flip-index, 0) * var(--flip-stagger-ms, 22ms));
+}
+/* Both faces share one grid cell and stay locked together as the card
+   turns, so there is never an offset that exposes another layer. */
+.deck-flip-face {
+  grid-area: 1 / 1;
+  position: relative;
+  display: grid;
+  width: var(--card-width);
+  aspect-ratio: 5 / 7;
+  border-radius: 7px;
+  background: #fbf8ef;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+  overflow: hidden;
+}
+.deck-flip-face::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: inherit;
+}
+.deck-flip-front {
+  transform: rotateX(0deg);
+  animation: countdown-front-face var(--flip-duration-ms, 180ms) steps(1, end) both;
+  animation-delay: calc(var(--flip-index, 0) * var(--flip-stagger-ms, 22ms));
+}
+.deck-flip-back {
+  transform: rotateX(180deg);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 10px 10px,
+    linear-gradient(225deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 10px 10px,
+    #243a79;
+  animation: countdown-back-face var(--flip-duration-ms, 180ms) steps(1, end) both;
+  animation-delay: calc(var(--flip-index, 0) * var(--flip-stagger-ms, 22ms));
+}
+.deck-flip-face .card {
+  z-index: 1;
+  margin-left: 0;
+}
+.deck-flip-back .card.back {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 10px 10px,
+    linear-gradient(225deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 10px 10px,
+    #243a79;
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.34);
+  opacity: 1;
+}
+.no-animation .deck-flip-inner,
+.no-animation .deck-flip-front {
+  animation: none;
+}
+.no-animation .deck-flip-front {
+  visibility: visible;
+}
+.no-animation .deck-flip-back {
+  display: none;
+  animation: none;
+}
+@keyframes countdown-front-face {
+  0%,
+  49% {
+    visibility: hidden;
+  }
+  50%,
+  100% {
+    visibility: visible;
+  }
+}
+@keyframes countdown-back-face {
+  0%,
+  49% {
+    visibility: visible;
+  }
+  50%,
+  100% {
+    visibility: hidden;
+  }
+}
+@keyframes countdown-flip {
+  0% {
+    transform: translate3d(0, 18px, 0) rotateX(-180deg) rotateZ(-1.5deg);
+    filter: brightness(0.96);
+  }
+  40% {
+    transform: translate3d(0, 8px, 34px) rotateX(-92deg) rotateZ(-0.6deg);
+    filter: brightness(1.03);
+  }
+  66% {
+    transform: translate3d(0, 3px, 16px) rotateX(-28deg) rotateZ(0deg);
+    filter: brightness(1.01);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotateX(0deg) rotateZ(0deg);
+    filter: brightness(1);
+  }
+}
+.countdown-number {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid rgba(217, 180, 90, 0.65);
+  color: var(--gold);
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 48px;
+  font-weight: 900;
+}
+.deck-countdown-controls {
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 620px) {
+  .deck-progress,
+  .deck-countdown-controls {
+    grid-template-columns: 1fr;
+  }
+  .deck-progress,
+  .deck-progress span:last-child {
+    text-align: center;
+  }
 }
 
 /* On-screen keyboard shortcut help lines */

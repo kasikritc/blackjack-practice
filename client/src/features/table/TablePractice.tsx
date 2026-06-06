@@ -9,6 +9,7 @@ import { useSettings } from "../../lib/useSettings";
 import { TableAnalytics } from "../analytics/TableAnalytics";
 import { TrackingControls } from "../analytics/AnalyticsShared";
 import type { CountCheckResult, Seat } from "./engine";
+import { DealerHand } from "./DealerHand";
 import { ShoeBoxes } from "./ShoeBoxes";
 import { useTableGame } from "./useTableGame";
 
@@ -64,7 +65,7 @@ function SeatView({ seat }: { seat: Seat }) {
       <div className="seat-label">
         <span>{seat.name}</span>
       </div>
-      <Hand cards={seat.hand} />
+      {seat.role === "dealer" ? <DealerHand cards={seat.hand} /> : <Hand cards={seat.hand} />}
     </>
   );
 }

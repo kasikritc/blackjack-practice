@@ -251,15 +251,15 @@ export class TableEngine {
   }
 
   private async dealInitialCards(): Promise<void> {
-    for (const seat of this.seats) await this.dealTo(seat, true);
+    for (const seat of this.clockwisePlayerSeats()) await this.dealTo(seat, true);
     await this.dealTo(this.dealer, true);
-    for (const seat of this.seats) await this.dealTo(seat, true);
+    for (const seat of this.clockwisePlayerSeats()) await this.dealTo(seat, true);
     await this.dealTo(this.dealer, false);
   }
 
   private async playPlayers(): Promise<void> {
     this.phase = "players";
-    for (const seat of this.seats) {
+    for (const seat of this.clockwisePlayerSeats()) {
       this.setStatus(`${seat.name} playing.`);
       await this.waitForThink(seat.role === "dealer" ? "dealer" : "player");
       while (handValue(seat.hand).total < 17 && !isBlackjack(seat.hand)) {
@@ -273,6 +273,10 @@ export class TableEngine {
       seat.stood = true;
       await this.waitForSpeed();
     }
+  }
+
+  private clockwisePlayerSeats(): Seat[] {
+    return [...this.seats].reverse();
   }
 
   private async playDealer(): Promise<void> {

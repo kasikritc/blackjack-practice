@@ -513,6 +513,39 @@ button:disabled {
 .card:last-child .bottom-rank {
   visibility: visible;
 }
+.table-dealer-hand {
+  position: relative;
+  width: 100%;
+  min-height: max(72px, calc(clamp(52px, 12vw, 70px) * 1.4));
+  overflow: visible;
+}
+.dealer-card-slot {
+  position: absolute;
+  top: 0;
+  transition:
+    left 0.16s ease,
+    width 0.16s ease;
+}
+.dealer-card-slot .card {
+  --card-width: var(--dealer-render-width);
+  --card-padding: clamp(2px, calc(var(--dealer-render-width) * 0.07), 5px);
+  --rank-size: clamp(8px, calc(var(--dealer-render-width) * 0.22), 16px);
+  --pip-size: clamp(12px, calc(var(--dealer-render-width) * 0.38), 28px);
+  --corner-width: clamp(12px, calc(var(--dealer-render-width) * 0.31), 22px);
+  width: 100%;
+  margin-left: 0;
+}
+.dealer-card-slot .card .pip,
+.dealer-card-slot .card .bottom-rank {
+  visibility: visible;
+}
+.dealer-card-slot.is-hole {
+  z-index: 1;
+}
+.dealer-card-slot.is-upcard,
+.dealer-card-slot.is-hit {
+  z-index: 2;
+}
 
 /* ---------- Shoe boxes ---------- */
 .shoe-box {

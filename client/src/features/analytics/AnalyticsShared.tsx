@@ -205,7 +205,7 @@ export function SessionsList({
   sessions: SessionRow[];
   hasMore: boolean;
   onLoadMore: () => void;
-  variant: "table" | "flash";
+  variant: "table" | "flash" | "deckCountdown";
 }) {
   if (!sessions.length) {
     return <p className="empty-state">No sessions in this range.</p>;
@@ -240,7 +240,9 @@ export function SessionsList({
                       <span>
                         {variant === "flash"
                           ? `${checks} rounds · ${formatCards(num(session, "avg_cards"))} avg`
-                          : `${formatMinSec(num(session, "play_ms"))} · ${num(session, "hands")} hands · ${checks} checks · ${num(session, "shoes")} shoes`}
+                          : variant === "deckCountdown"
+                            ? `${checks} rounds · ${formatCards(num(session, "cards"))} seen · ${formatCards(num(session, "avg_cards_per_flip"))}/flip`
+                            : `${formatMinSec(num(session, "play_ms"))} · ${num(session, "hands")} hands · ${checks} checks · ${num(session, "shoes")} shoes`}
                       </span>
                     </div>
                     <div>
@@ -252,7 +254,9 @@ export function SessionsList({
                           ? `${formatNumber(num(session, "avg_error"))} avg err · ${formatMs(num(session, "avg_response_ms"))}`
                           : variant === "flash"
                             ? "No rounds yet"
-                            : "No checks yet"}
+                            : variant === "deckCountdown"
+                              ? "No rounds yet"
+                              : "No checks yet"}
                       </span>
                     </div>
                   </div>

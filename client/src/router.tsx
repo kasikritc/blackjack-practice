@@ -5,6 +5,7 @@ import { HomePage } from "./pages/HomePage";
 import { TablePracticePage } from "./pages/TablePracticePage";
 import { FlashCountPage } from "./pages/FlashCountPage";
 import { BasicStrategyPage } from "./pages/BasicStrategyPage";
+import { DeckCountdownPage } from "./pages/DeckCountdownPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
 export const router = createBrowserRouter([
@@ -15,6 +16,7 @@ export const router = createBrowserRouter([
       { path: DRILL_PATHS.table, element: <TablePracticePage /> },
       { path: DRILL_PATHS.flash, element: <FlashCountPage /> },
       { path: DRILL_PATHS.strategy, element: <BasicStrategyPage /> },
+      { path: DRILL_PATHS.deckCountdown, element: <DeckCountdownPage /> },
       { path: "*", element: <NotFoundPage /> }
     ]
   }

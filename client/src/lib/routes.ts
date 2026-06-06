@@ -4,7 +4,8 @@ import type { DrillMode } from "@blackjack/shared";
 export const DRILL_PATHS: Record<Exclude<DrillMode, "home">, string> = {
   table: "/table-practice",
   flash: "/flash-count",
-  strategy: "/basic-strategy"
+  strategy: "/basic-strategy",
+  deckCountdown: "/deck-countdown"
 };
 
 export interface DrillMeta {
@@ -38,5 +39,13 @@ export const DRILLS: DrillMeta[] = [
     tagline: "Decision drill",
     description:
       "Practice two-card player decisions against a dealer upcard using your own saved charts and house rules."
+  },
+  {
+    mode: "deckCountdown",
+    path: DRILL_PATHS.deckCountdown,
+    title: "Deck Countdown",
+    tagline: "Full deck speed",
+    description:
+      "Flip through complete shuffled decks and submit the ending Hi-Lo count. Built for speed and accuracy."
   }
 ];

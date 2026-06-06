@@ -516,7 +516,7 @@ button:disabled {
 .table-dealer-hand {
   position: relative;
   width: 100%;
-  min-height: max(72px, calc(clamp(30px, 8vw, 58px) * 1.4));
+  min-height: max(72px, calc(clamp(52px, 12vw, 70px) * 1.4));
   overflow: visible;
 }
 .dealer-card-slot {

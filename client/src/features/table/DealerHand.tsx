@@ -17,12 +17,13 @@ interface PositionedCard {
 
 const DEFAULT_METRICS: DealerHandMetrics = {
   areaWidth: 0,
-  cardWidth: 58,
+  cardWidth: 70,
   gap: 6
 };
 
 function responsiveCardWidth(): number {
-  return Math.min(58, Math.max(30, window.innerWidth * 0.08));
+  if (window.innerWidth <= 640) return 42;
+  return Math.min(70, Math.max(52, window.innerWidth * 0.12));
 }
 
 function responsiveGap(): number {
@@ -66,7 +67,9 @@ export function DealerHand({ cards }: { cards: GameCard[] }) {
   const hole = cards[1];
   const hits = cards.slice(2).reverse();
   const { areaWidth, cardWidth, gap } = metrics;
-  const upcardLeft = (areaWidth - (cardWidth * 2 + gap)) / 2;
+  const holeVisible = hole?.visible ?? false;
+  const anchoredWidth = hole ? (holeVisible ? cardWidth * 2 + gap : cardWidth * 1.2) : cardWidth;
+  const upcardLeft = (areaWidth - anchoredWidth) / 2;
   const anchoredLeft = upcardLeft - hits.length * (cardWidth + gap);
   const centered = hits.length > 0 && anchoredLeft < 0;
   const visibleCards = [

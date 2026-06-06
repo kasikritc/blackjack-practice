@@ -273,7 +273,6 @@ export function DeckCountdown() {
       let count = 3;
       setCountdown(count);
       setPhase("countdown");
-      setStatus("Get ready.");
       countdownTimerRef.current = window.setInterval(() => {
         count -= 1;
         if (count > 0) {
@@ -606,7 +605,7 @@ export function DeckCountdown() {
           <span>Stopwatch hidden</span>
         )}
       </div>
-      {phase !== "running" ? (
+      {phase !== "running" && phase !== "countdown" ? (
         <div className="deck-status" role="status">
           {status}
         </div>

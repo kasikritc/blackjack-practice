@@ -1,6 +1,10 @@
 # Blackjack Practice
 
-A local full-stack web app for practicing Hi-Lo blackjack card counting and basic strategy. Three drills — an automated **Table Practice** shoe, a **Flash Count** speed drill, and a **Basic Strategy** decision trainer — each at its own route, backed by a typed REST API and local SQLite analytics.
+A mobile-friendly blackjack trainer for practicing Hi-Lo card counting and basic
+strategy, with four customizable drills: **Table Practice**, **Flash Count**,
+**Basic Strategy**, and **Deck Countdown**. Practice data stays private in a
+local SQLite database with detailed analytics for tracking accuracy and
+progress.
 
 ![Blackjack Practice gameplay](./docs/blackjack-gameplay.png)
 

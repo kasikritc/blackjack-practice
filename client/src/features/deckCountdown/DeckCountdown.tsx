@@ -12,7 +12,7 @@ import {
   clampDeckCountdownInterval,
   clampDeckCountdownOmittedCards
 } from "../../lib/settings";
-import { getHiLoValue, makeShoe, signed, type GameCard } from "../../lib/cards";
+import { cardLabel, getHiLoValue, makeShoe, signed, type GameCard } from "../../lib/cards";
 import { useSettings } from "../../lib/useSettings";
 import { TrackingControls } from "../analytics/AnalyticsShared";
 import { configureTracking, trackDeckCountdownRound } from "../analytics/tracker";
@@ -395,19 +395,19 @@ export function DeckCountdown() {
         <span>Elapsed</span>
         <strong>{formatMs(feedback.elapsedMs)}</strong>
       </div>
-      <div className="omitted-cards-review">
-        <span className="omitted-cards-title">Omitted cards</span>
+      <h3>Omitted cards</h3>
+      <div className="count-card-grid">
         {feedback.omittedCards.length ? (
-          <div className="omitted-card-list">
-            {feedback.omittedCards.map(card => (
-              <span className="omitted-card-item" key={card.id}>
-                <PlayingCard card={card} faceUp />
-                <strong>{signed(getHiLoValue(card))}</strong>
-              </span>
-            ))}
-          </div>
+          feedback.omittedCards.map(card => (
+            <span className="count-card" key={card.id}>
+              <span>{cardLabel(card)}</span>
+              <strong>{signed(getHiLoValue(card))}</strong>
+            </span>
+          ))
         ) : (
-          <p className="omitted-card-empty">No cards omitted</p>
+          <span className="count-card empty">
+            No cards omitted <strong>0</strong>
+          </span>
         )}
       </div>
     </div>

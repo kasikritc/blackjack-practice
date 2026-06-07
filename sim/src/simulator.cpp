@@ -112,6 +112,7 @@ struct CellResult {
   double paired_confidence_high = 0;
   int policy_iteration = 1;
   double mean_exact_true_count = 0;
+  std::map<std::string, std::map<std::string, long long>> continuation_observations;
 };
 
 uint64_t hash_seed(const std::string& value) {
@@ -293,6 +294,26 @@ class FrozenPolicy final : public Policy {
   std::unordered_map<std::string, Action> actions_;
 };
 
+class RecordingPolicy final : public Policy {
+ public:
+  explicit RecordingPolicy(const FrozenPolicy& delegate) : delegate_(delegate) {}
+  Action choose(const HandState& hand, Rank dealer, const Rules& rules, int total_hands) const override {
+    const Action action = delegate_.choose(hand, dealer, rules, total_hands);
+    const std::string context = composition_key(hand.cards) + "|dealer=" + dealer_label(dealer) +
+      "|fromSplit=" + (hand.from_split ? "1" : "0") +
+      "|splitAces=" + (hand.split_aces ? "1" : "0") +
+      "|hands=" + std::to_string(total_hands);
+    ++observations_[context][action_name(action)];
+    return action;
+  }
+  const std::map<std::string, std::map<std::string, long long>>& observations() const {
+    return observations_;
+  }
+ private:
+  const FrozenPolicy& delegate_;
+  mutable std::map<std::string, std::map<std::string, long long>> observations_;
+};
+
 std::vector<Action> first_actions(const std::string& category, const std::string& row_key,
                                   const Composition& composition, const Rules& rules) {
   HandState hand{composition.cards};
@@ -377,6 +398,7 @@ CellResult simulate_cell(const Config& config, const std::string& category,
   }
   cell.mean_exact_true_count = exact_tc_count ? exact_tc_sum / exact_tc_count : true_count;
 
+  RecordingPolicy recording_policy(policy);
   std::vector<std::vector<RunningStats>> paired(actions.size(),
                                                 std::vector<RunningStats>(actions.size()));
   long long completed = 0;
@@ -395,7 +417,7 @@ CellResult simulate_cell(const Config& config, const std::string& category,
         auto rng = make_rng(config, category + row_key + cell.dealer + ":paired:" +
                             std::to_string(true_count) + ":" + std::to_string(decks_remaining), sample_index);
         const auto outcome = simulate_round(config.rules, composition.cards, dealer, actions[ai],
-                                            policy, shoe_sample.shoe, rng);
+                                            recording_policy, shoe_sample.shoe, rng);
         profits[ai] = outcome.profit;
         cell.actions[ai].stats.add(outcome);
         cell.actions[ai].compositions[composition.key].add(outcome);
@@ -429,6 +451,7 @@ CellResult simulate_cell(const Config& config, const std::string& category,
     return a.stats.mean() > b.stats.mean();
   });
   cell.best_action = cell.actions.front().action;
+  cell.continuation_observations = recording_policy.observations();
   if (!cell.converged) { cell.confidence = "low"; cell.stop_reason = "sample-cap"; }
   if (cell.best_action == Action::Double || cell.best_action == Action::Surrender) {
     for (const auto& result : cell.actions) {
@@ -548,11 +571,20 @@ void write_artifacts(const Config& config, const std::vector<CellResult>& cells,
           {"ev", stats.mean()}, {"standardError", stats.standard_error()}});
       }
       for (const auto& [key, stats] : action.compositions) {
-        composition.push_back({{"category", cell.category}, {"rowKey", cell.row_key},
+        composition.push_back({{"kind", "counterfactual-start"}, {"category", cell.category}, {"rowKey", cell.row_key},
           {"dealerUpcard", cell.dealer}, {"trueCount", cell.true_count},
           {"decksRemaining", cell.decks_remaining}, {"composition", key},
           {"action", action_name(action.action)}, {"samples", stats.samples}, {"ev", stats.mean()},
           {"standardError", stats.standard_error()}});
+      }
+    }
+    for (const auto& [state, actions] : cell.continuation_observations) {
+      for (const auto& [action, observations] : actions) {
+        composition.push_back({{"kind", "continuation-observation"},
+          {"sourceCategory", cell.category}, {"sourceRowKey", cell.row_key},
+          {"dealerUpcard", cell.dealer}, {"trueCount", cell.true_count},
+          {"decksRemaining", cell.decks_remaining}, {"state", state},
+          {"selectedAction", action}, {"observations", observations}});
       }
     }
   }
@@ -585,7 +617,7 @@ void write_artifacts(const Config& config, const std::vector<CellResult>& cells,
     }
   }
   std::ofstream(run_dir / "simulation-summary.json") << std::setw(2) << summary << '\n';
-  std::ofstream(run_dir / "composition-results.json") << std::setw(2) << composition << '\n';
+  std::ofstream(run_dir / "composition-evidence.json") << std::setw(2) << composition << '\n';
   std::ofstream(run_dir / "count-strata-results.json") << std::setw(2) << count_strata << '\n';
 
   json insurance = json::array();

@@ -30,6 +30,7 @@
     "eval:smoke": "sim/build/evaluate-strategy run --config sim/configs/eval-smoke-fresh.json --output /tmp/blackjack-eval-runs && sim/build/evaluate-strategy run --config sim/configs/eval-smoke-continuous.json --output /tmp/blackjack-eval-runs",
     "sim:smoke": "sim/build/simulate-strategy run --config sim/configs/smoke.json --output /tmp/blackjack-sim-runs",
     "sim:export-png": "tsx scripts/export-chart-png.ts",
+    "strategy:export": "tsx scripts/export-strategy-package.ts",
     "sim:test": "ctest --test-dir sim/build --output-on-failure",
     "sim:sanitize": "cmake -S sim -B sim/build-sanitize -DCMAKE_BUILD_TYPE=Debug -DSIM_ENABLE_SANITIZERS=ON && cmake --build sim/build-sanitize -j && ctest --test-dir sim/build-sanitize --output-on-failure",
     "sim:check": "npm run sim:build && npm run sim:test && npm run sim:smoke"

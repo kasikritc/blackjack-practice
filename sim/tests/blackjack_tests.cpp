@@ -48,6 +48,42 @@ void test_split_ace_lock() {
   check(actions.size() == 1 && actions.front() == Action::Stand, "split ace lock");
 }
 
+
+struct StandPolicy final : Policy {
+  Action choose(const HandState&, Rank, const Rules&, int) const override { return Action::Stand; }
+};
+
+Shoe exact_shoe(std::initializer_list<Rank> cards) {
+  Shoe shoe;
+  shoe.counts.fill(0);
+  for (Rank rank : cards) { ++shoe.counts[static_cast<int>(rank)]; ++shoe.total; }
+  return shoe;
+}
+
+void test_peek_and_surrender_timing() {
+  StandPolicy policy;
+  Rules early;
+  early.surrender = "early";
+  auto natural_shoe = exact_shoe({Rank::Nine, Rank::Seven, Rank::Ace, Rank::King});
+  std::mt19937_64 rng1(1);
+  auto lost = simulate_round(early, {Rank::Nine, Rank::Seven}, Rank::Ace, Action::Stand,
+                             policy, natural_shoe, rng1);
+  check(lost.dealer_blackjack && lost.profit == -1.0, "early surrender declined dealer natural");
+  std::mt19937_64 rng2(1);
+  auto surrendered = simulate_round(early, {Rank::Nine, Rank::Seven}, Rank::Ace,
+                                    Action::Surrender, policy, natural_shoe, rng2);
+  check(surrendered.profit == -0.5, "early surrender precedes peek");
+
+  Rules late;
+  late.surrender = "late";
+  auto peek_shoe = exact_shoe({Rank::Nine, Rank::Seven, Rank::Ace, Rank::King, Rank::Two,
+                               Rank::Four, Rank::Ten, Rank::Ten});
+  std::mt19937_64 rng3(2);
+  auto post_peek = simulate_round(late, {Rank::Nine, Rank::Seven}, Rank::Ace, Action::Stand,
+                                  policy, peek_shoe, rng3);
+  check(!post_peek.dealer_blackjack, "late surrender actions condition on successful peek");
+}
+
 void test_natural_identity() {
   HandState original{{Rank::Ace, Rank::King}};
   HandState split{{Rank::Ace, Rank::King}, 1.0, true, true};
@@ -63,6 +99,7 @@ int main() {
     test_action_legality();
     test_split_ace_lock();
     test_natural_identity();
+    test_peek_and_surrender_timing();
     std::cout << "blackjack tests passed\n";
     return 0;
   } catch (const std::exception& error) {

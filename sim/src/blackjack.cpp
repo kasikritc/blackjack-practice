@@ -183,13 +183,23 @@ RoundOutcome simulate_round(const Rules& rules, const std::vector<Rank>& initial
   if (!remove_card(shoe, dealer_upcard)) throw std::invalid_argument("dealer upcard absent from shoe");
 
   std::vector<Rank> dealer{dealer_upcard, draw_card(shoe, rng)};
-  const bool dealer_has_natural = dealer_natural(dealer);
-  if (rules.surrender == "early" && first_action == Action::Surrender)
-    return {-0.5, 1, 0, 1, 0, 0, 0, 1, false, dealer_has_natural};
-  if (dealer_has_natural) {
-    HandState player{initial_player};
-    if (is_natural(player)) return {0.0, 1, 0, 0, 1, 0, 0, 0, true, true};
-    return {-1.0, 1, 0, 1, 0, 0, 0, 0, false, true};
+  bool dealer_has_natural = dealer_natural(dealer);
+  if (rules.surrender == "early") {
+    if (first_action == Action::Surrender)
+      return {-0.5, 1, 0, 1, 0, 0, 0, 1, false, dealer_has_natural};
+    if (dealer_has_natural) {
+      HandState player{initial_player};
+      if (is_natural(player)) return {0.0, 1, 0, 0, 1, 0, 0, 0, true, true};
+      return {-1.0, 1, 0, 1, 0, 0, 0, 0, false, true};
+    }
+  } else {
+    while (dealer_has_natural) {
+      const Rank rejected = dealer.back();
+      ++shoe.counts[static_cast<int>(rejected)];
+      ++shoe.total;
+      dealer.back() = draw_card(shoe, rng);
+      dealer_has_natural = dealer_natural(dealer);
+    }
   }
 
   std::vector<HandState> hands{HandState{initial_player}};

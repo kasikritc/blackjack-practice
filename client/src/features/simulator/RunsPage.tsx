@@ -329,6 +329,14 @@ export function RunsPage() {
                     Rerun
                   </button>
                 ) : null}
+                {detail.status === "completed" && detail.workflow === "evaluator" ? (
+                  <button
+                    className="ghost-button"
+                    onClick={() => void action(() => simulatorApi.regenerateSummary(detail.id))}
+                  >
+                    Regenerate summary
+                  </button>
+                ) : null}
                 {detail.status === "completed" && !canRerun(detail) ? (
                   <span
                     className="sim-legacy-note"
@@ -399,6 +407,28 @@ export function RunsPage() {
                       Cells {detail.progress.completedCells}/{detail.progress.totalCells}
                     </span>
                     <span>Converged {detail.progress.convergedCells || 0}</span>
+                    {detail.progress.currentCell ? (
+                      <>
+                        <span>
+                          Current {detail.progress.currentCell.category}{" "}
+                          {detail.progress.currentCell.rowKey} vs{" "}
+                          {detail.progress.currentCell.dealerUpcard}
+                        </span>
+                        <span>
+                          {detail.progress.currentCell.bestAction} ·{" "}
+                          {detail.progress.currentCell.samples.toLocaleString()} samples
+                        </span>
+                        <span>
+                          Margin {detail.progress.currentCell.winnerMargin.toFixed(6)} · CI{" "}
+                          {detail.progress.currentCell.pairedConfidenceLow.toFixed(6)} to{" "}
+                          {detail.progress.currentCell.pairedConfidenceHigh.toFixed(6)}
+                        </span>
+                        <span>
+                          {detail.progress.currentCell.converged ? "Converged" : "Sampling"} ·{" "}
+                          {detail.progress.currentCell.stopReason}
+                        </span>
+                      </>
+                    ) : null}
                   </div>
                 ) : detail.progress?.workflow === "evaluator" ? (
                   <div className="sim-live-evidence">
@@ -440,6 +470,7 @@ export function RunsPage() {
                   }
                   onBucketChange={setSelectedBucket}
                   onImport={bucket => void openImport(bucket)}
+                  chartUrl={bucket => simulatorApi.artifactUrl(detail.id, `charts/${bucket}.json`)}
                 />
               ) : null}
               {tab === "results" && detail.evaluatorSummary ? (
@@ -474,11 +505,50 @@ export function RunsPage() {
                       </div>
                       <div>
                         <span>Platform</span>
-                        <strong>{detail.reproducibility.machine?.platform || "unknown"}</strong>
+                        <strong>
+                          {detail.reproducibility.machine?.platform || "unknown"}{" "}
+                          {detail.reproducibility.machine?.release || ""}
+                        </strong>
                       </div>
                       <div>
                         <span>CPU</span>
                         <strong>{detail.reproducibility.machine?.cpu || "unknown"}</strong>
+                      </div>
+                      <div>
+                        <span>Host</span>
+                        <strong>{detail.reproducibility.machine?.hostname || "unknown"}</strong>
+                      </div>
+                      <div>
+                        <span>Architecture</span>
+                        <strong>{detail.reproducibility.machine?.architecture || "unknown"}</strong>
+                      </div>
+                      <div>
+                        <span>CPU cores</span>
+                        <strong>{detail.reproducibility.machine?.cpuCores || "unknown"}</strong>
+                      </div>
+                      <div>
+                        <span>System memory</span>
+                        <strong>
+                          {detail.reproducibility.machine?.memoryBytes
+                            ? formatBytes(detail.reproducibility.machine.memoryBytes)
+                            : "unknown"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Started</span>
+                        <strong>
+                          {detail.startedAt
+                            ? new Date(detail.startedAt).toLocaleString()
+                            : "not started"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Completed</span>
+                        <strong>
+                          {detail.completedAt
+                            ? new Date(detail.completedAt).toLocaleString()
+                            : "not completed"}
+                        </strong>
                       </div>
                     </div>
                   </section>

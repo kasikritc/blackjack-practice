@@ -51,6 +51,8 @@ export const simulatorApi = {
       "GET",
       `/runs/${encodeURIComponent(id)}/evaluator-analysis`
     ),
+  regenerateSummary: (id: string) =>
+    request<SimulatorRunDetail>("POST", `/runs/${encodeURIComponent(id)}/summarize`),
   validate: (payload: SimulatorRunRequest) =>
     request<SimulatorValidationResponse>("POST", "/validate", payload),
   submit: (payload: SimulatorRunRequest) => request<SimulatorRunDetail>("POST", "/runs", payload),

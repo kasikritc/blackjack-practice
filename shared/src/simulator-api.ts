@@ -264,6 +264,7 @@ export interface SimulatorServiceHealth {
   ok: boolean;
   version: string;
   nativeBuildAvailable: boolean;
+  cudaDevices?: number;
   activeRunId?: string;
   queuedRuns: number;
   concurrency: number;

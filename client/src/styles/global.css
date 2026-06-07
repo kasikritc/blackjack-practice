@@ -3237,6 +3237,13 @@ button:disabled {
   font-size: 10px;
 }
 
+.sim-download-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .sim-live-progress {
   display: grid;
   grid-template-columns: auto minmax(120px, 1fr) auto;

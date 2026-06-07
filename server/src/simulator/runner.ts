@@ -123,7 +123,6 @@ function artifactFiles(root: string): SimulatorArtifact[] {
   const results: SimulatorArtifact[] = [];
   const visit = (directory: string) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      if (results.length >= 1000) return;
       const absolute = path.join(directory, entry.name);
       if (entry.isDirectory()) visit(absolute);
       else if (entry.isFile()) {
@@ -170,6 +169,20 @@ function reproducibility(workerThreads?: number): SimulatorReproducibility {
     workerThreads,
     machine: machineInfo()
   };
+}
+
+function cudaDeviceCount(): number | undefined {
+  if (!fs.existsSync(GENERATOR_BINARY)) return undefined;
+  try {
+    const output = execFileSync(GENERATOR_BINARY, ["devices"], {
+      cwd: ROOT,
+      encoding: "utf8"
+    });
+    const match = output.match(/cudaDevices=(\d+)/);
+    return match ? Number(match[1]) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function validateGenerator(config: StrategySimulationConfig): SimulatorValidationIssue[] {
@@ -351,6 +364,7 @@ export class SimulatorRunner {
       ok: true,
       version: "0.1.0",
       nativeBuildAvailable: fs.existsSync(GENERATOR_BINARY) && fs.existsSync(EVALUATOR_BINARY),
+      cudaDevices: cudaDeviceCount(),
       activeRunId: this.children.keys().next().value,
       queuedRuns: this.store.queued().length,
       concurrency: SIM_CONCURRENCY,
@@ -371,6 +385,26 @@ export class SimulatorRunner {
     if (!run) return null;
     const output = run.outputDirectory;
     run.artifacts = output ? artifactFiles(output) : [];
+    const manifest = output
+      ? readJson<Record<string, any>>(path.join(output, "manifest.json"))
+      : undefined;
+    if (manifest) {
+      run.reproducibility = {
+        ...run.reproducibility,
+        simulatorVersion:
+          manifest.simulatorVersion ||
+          manifest.evaluatorVersion ||
+          run.reproducibility.simulatorVersion,
+        workerThreads:
+          manifest.workerThreads ||
+          manifest.hardware?.workerThreads ||
+          run.reproducibility.workerThreads,
+        machine: {
+          ...run.reproducibility.machine,
+          ...manifest.hardware
+        }
+      };
+    }
     if (output && run.workflow === "generator")
       run.generatorSummary = normalizeGeneratorSummary(
         output,
@@ -410,6 +444,22 @@ export class SimulatorRunner {
     );
     if (!analysis) throw new Error("Evaluator aggregate analysis is not available.");
     return analysis;
+  }
+
+  regenerateEvaluatorSummary(id: string): SimulatorRunDetail {
+    const run = this.store.detail(id);
+    if (!run?.outputDirectory || run.workflow !== "evaluator")
+      throw new Error("Evaluator run artifacts are not available.");
+    if (!fs.existsSync(EVALUATOR_BINARY)) throw new Error("Native evaluator binary is not built.");
+    const summary = execFileSync(EVALUATOR_BINARY, ["summarize", "--run", run.outputDirectory], {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    JSON.parse(summary);
+    fs.writeFileSync(path.join(run.outputDirectory, "summary.json"), `${summary.trim()}\n`);
+    this.store.appendLog(id, "service: regenerated summary.json from aggregate-data.json.zst");
+    return this.detail(id)!;
   }
 
   validate(request: SimulatorRunRequest): SimulatorValidationResponse {

@@ -262,6 +262,9 @@ export function createSimulatorApp(runner = new SimulatorRunner()) {
   app.get("/sim-api/runs/:id/evaluator-analysis", (req, res) =>
     res.json(runner.evaluatorAnalysis(req.params.id))
   );
+  app.post("/sim-api/runs/:id/summarize", (req, res) =>
+    res.json(runner.regenerateEvaluatorSummary(req.params.id))
+  );
   app.get("/sim-api/runs/:id/artifacts/*", (req, res) => {
     const relativePath = (req.params as Record<string, string>)[0];
     const file = runner.artifactPath(req.params.id, relativePath);

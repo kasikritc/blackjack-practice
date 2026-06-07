@@ -45,13 +45,15 @@ export function GeneratorResults({
   summary,
   selectedBucket,
   onBucketChange,
-  onImport
+  onImport,
+  chartUrl
 }: {
   runId: string;
   summary: StrategySimulationSummary;
   selectedBucket: string;
   onBucketChange: (bucket: string) => void;
   onImport: (bucket: string) => void;
+  chartUrl: (bucket: string) => string;
 }) {
   const [selectedCell, setSelectedCell] = useState<StrategySimulationCellResult | null>(null);
   const buckets = Object.keys(summary.charts);
@@ -102,6 +104,9 @@ export function GeneratorResults({
         >
           Review chart import
         </button>
+        <a className="ghost-button sim-download-button" href={chartUrl(selectedBucket)}>
+          Export selected chart
+        </a>
       </div>
 
       <div className="sim-chart-evidence-layout">

@@ -556,8 +556,12 @@ void write_artifacts(const Config& config, const std::vector<CellResult>& cells,
       bool converged = true;
       for (const auto& cell : cells)
         if (cell.true_count == tc && cell.decks_remaining == decks && !cell.converged) converged = false;
+      json package_cells = json::array();
+      for (const auto& cell : cells)
+        if (cell.true_count == tc && cell.decks_remaining == decks)
+          package_cells.push_back(cell_json(cell, config.confidence_z));
       json package = {{"schemaVersion", 1}, {"name", config.name + " " + bucket},
-        {"rules", rules_json(config.rules)}, {"chart", chart},
+        {"rules", rules_json(config.rules)}, {"chart", chart}, {"cells", package_cells},
         {"source", {{"simulatorRunId", run_id}, {"seed", config.seed}, {"trueCount", tc},
                     {"decksRemaining", decks}, {"artifactPath", (run_dir / "charts" / (bucket + ".json")).string()}}},
         {"validation", {{"gameFamily", "american-peek"}, {"fullySupported", validated_profile(config.rules)},

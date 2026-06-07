@@ -1,15 +1,26 @@
 import type { StrategyAction, StrategyChart, StrategyRules } from "./strategy.js";
 
+export type StrategySimulationConfidence = "high" | "low";
+export type StrategySimulationStopReason =
+  | "paired-confidence"
+  | "sample-cap"
+  | "single-legal-action"
+  | "policy-iteration-cap";
+
 export interface StrategySimulationConfig {
   name: string;
   seed: string;
   rules: StrategyRules;
-  samplesPerAction: number;
-  policySamplesPerDecision?: number;
+  minSamplesPerAction: number;
+  maxSamplesPerAction: number;
+  batchSize: number;
+  shoeSamplesPerBucket: number;
+  maxPolicyIterations: number;
+  minimumEvMargin: number;
+  confidenceZ: number;
   trueCountBuckets: number[];
   decksRemainingBuckets: number[];
-  maxPolicyIterations: number;
-  convergenceEpsilon: number;
+  trueCountRounding: "nearest" | "truncate";
 }
 
 export interface StrategySimulationHardware {
@@ -22,10 +33,17 @@ export interface StrategySimulationHardware {
 export interface StrategySimulationManifest {
   id: string;
   createdAt: string;
+  elapsedMs?: number;
   simulatorVersion: string;
   gitCommit?: string;
   config: StrategySimulationConfig;
   hardware?: StrategySimulationHardware;
+  capabilities?: {
+    gameFamily: "american-peek";
+    totalDependent: boolean;
+    compositionEvidence: boolean;
+    insuranceSideDecision: boolean;
+  };
 }
 
 export interface StrategySimulationActionStats {
@@ -52,32 +70,49 @@ export interface StrategySimulationCellResult {
   rowKey: string;
   dealerUpcard: string;
   trueCount: number;
+  meanExactTrueCount: number;
   decksRemaining: number;
   bestAction: StrategyAction;
   winnerMargin: number;
+  pairedStandardError: number;
+  pairedConfidenceLow: number;
+  pairedConfidenceHigh: number;
   samples: number;
   converged: boolean;
+  confidence: StrategySimulationConfidence;
+  stopReason: StrategySimulationStopReason;
   policyIteration: number;
   actions: StrategySimulationActionStats[];
 }
 
 export interface StrategySimulationSummary {
   manifest: StrategySimulationManifest;
-  chart: StrategyChart;
+  charts: Record<string, StrategyChart>;
   cells: StrategySimulationCellResult[];
 }
 
-export interface StrategyChartImportRequest {
+export interface StrategyChartImportPackage {
+  schemaVersion: 1;
   name: string;
   rules: StrategyRules;
   chart: StrategyChart;
-  source?: {
-    simulatorRunId?: string;
-    seed?: string;
-    trueCount?: number;
+  cells: StrategySimulationCellResult[];
+  source: {
+    simulatorRunId: string;
+    seed: string;
+    trueCount: number;
+    decksRemaining: number;
     artifactPath?: string;
   };
+  validation: {
+    gameFamily: "american-peek";
+    fullySupported: boolean;
+    allCellsConverged: boolean;
+    totalDependent: boolean;
+  };
 }
+
+export type StrategyChartImportRequest = StrategyChartImportPackage;
 
 export interface StrategyChartImportResponse {
   id: number;

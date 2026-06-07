@@ -220,6 +220,53 @@ std::string read_zstd(const std::filesystem::path& path) {
   return output;
 }
 
+class ZstdLineWriter {
+ public:
+  explicit ZstdLineWriter(const std::filesystem::path& path)
+      : output_(path, std::ios::binary), context_(ZSTD_createCCtx()), buffer_(ZSTD_CStreamOutSize()) {
+    if (!output_ || !context_) throw std::runtime_error("unable to create compressed raw artifact");
+    const size_t result = ZSTD_CCtx_setParameter(context_, ZSTD_c_compressionLevel, 3);
+    if (ZSTD_isError(result)) throw std::runtime_error("unable to configure zstd writer");
+  }
+
+  ~ZstdLineWriter() {
+    if (context_) {
+      try { close(); } catch (...) {}
+      ZSTD_freeCCtx(context_);
+    }
+  }
+
+  void write(const std::string& line) {
+    ZSTD_inBuffer input{line.data(), line.size(), 0};
+    while (input.pos < input.size) {
+      ZSTD_outBuffer output{buffer_.data(), buffer_.size(), 0};
+      const size_t result = ZSTD_compressStream2(context_, &output, &input, ZSTD_e_continue);
+      if (ZSTD_isError(result)) throw std::runtime_error("zstd raw stream compression failed");
+      output_.write(buffer_.data(), static_cast<std::streamsize>(output.pos));
+    }
+  }
+
+  void close() {
+    if (closed_) return;
+    ZSTD_inBuffer input{nullptr, 0, 0};
+    size_t remaining = 1;
+    while (remaining != 0) {
+      ZSTD_outBuffer output{buffer_.data(), buffer_.size(), 0};
+      remaining = ZSTD_compressStream2(context_, &output, &input, ZSTD_e_end);
+      if (ZSTD_isError(remaining)) throw std::runtime_error("zstd raw stream finalization failed");
+      output_.write(buffer_.data(), static_cast<std::streamsize>(output.pos));
+    }
+    output_.close();
+    closed_ = true;
+  }
+
+ private:
+  std::ofstream output_;
+  ZSTD_CCtx* context_ = nullptr;
+  std::vector<char> buffer_;
+  bool closed_ = false;
+};
+
 ObserverOutcome play_observer_round(const Rules& rules, int seats, Shoe& shoe, std::mt19937_64& rng) {
   const Shoe before = shoe;
   const int seat_count = std::max(1, seats);
@@ -268,6 +315,23 @@ Stats stats_from_json(const json& value) {
   stats.doubles = value.at("doubles"); stats.splits = value.at("splits");
   stats.insurance_taken = value.at("insuranceTaken"); stats.even_money_taken = value.at("evenMoneyTaken");
   return stats;
+}
+
+json path_result_json(const PathResult& path) {
+  json cubes = json::array();
+  for (const auto& [key, stats] : path.cubes) cubes.push_back({{"key", key}, {"stats", stats_json(stats)}});
+  return {{"stats", stats_json(path.stats)}, {"maxDrawdown", path.max_drawdown},
+          {"ruined", path.ruined}, {"cubes", cubes}};
+}
+
+PathResult path_result_from_json(const json& value) {
+  PathResult path;
+  path.stats = stats_from_json(value.at("stats"));
+  path.max_drawdown = value.at("maxDrawdown");
+  path.ruined = value.at("ruined").get<std::vector<bool>>();
+  for (const auto& cube : value.at("cubes"))
+    path.cubes[cube.at("key").get<std::string>()] = stats_from_json(cube.at("stats"));
+  return path;
 }
 
 json summary_json(const json& aggregate) {
@@ -338,9 +402,26 @@ int run_evaluation(const EvaluationOptions& options) {
       if (has_zero) throw std::invalid_argument("continuous zero-bet ramps require observerSeats above zero");
     }
 
-    const std::string run_id = slug(config.name) + "-" + now_compact();
-    const std::filesystem::path run_dir = std::filesystem::path(options.output_dir) / run_id;
-    std::filesystem::create_directories(run_dir);
+    const json strategy_json = read_json_file(config.strategy_path);
+    const json config_json = read_json_file(options.config_path);
+    const std::string run_id = options.resume_dir.empty()
+      ? slug(config.name) + "-" + now_compact()
+      : std::filesystem::path(options.resume_dir).filename().string();
+    const std::filesystem::path run_dir = options.resume_dir.empty()
+      ? std::filesystem::path(options.output_dir) / run_id
+      : std::filesystem::path(options.resume_dir);
+    if (options.resume_dir.empty()) {
+      std::filesystem::create_directories(run_dir);
+      json initial_manifest = {{"id", run_id}, {"createdAt", now_compact()}, {"status", "running"},
+        {"evaluatorVersion", kEvaluatorVersion}, {"seed", config.seed},
+        {"workerThreads", omp_get_max_threads()}, {"config", config_json}, {"strategy", strategy_json}};
+      std::ofstream(run_dir / "manifest.json") << std::setw(2) << initial_manifest << '\n';
+    } else {
+      const json existing = read_json_file((run_dir / "manifest.json").string());
+      if (existing.at("config") != config_json || existing.at("strategy") != strategy_json)
+        throw std::invalid_argument("resume config or strategy does not match the original run");
+    }
+    std::filesystem::create_directories(run_dir / "checkpoints");
     if (config.retention.mode != "aggregate") std::filesystem::create_directories(run_dir / "raw");
     std::vector<PathResult> paths(static_cast<size_t>(config.paths));
     std::vector<std::string> path_errors(static_cast<size_t>(config.paths));
@@ -348,13 +429,21 @@ int run_evaluation(const EvaluationOptions& options) {
     #pragma omp parallel for schedule(static)
     for (int path_index = 0; path_index < config.paths; ++path_index) {
       try {
+      const auto checkpoint_path = run_dir / "checkpoints" / ("path-" + std::to_string(path_index) + ".json.zst");
+      if (std::filesystem::exists(checkpoint_path)) {
+        try { paths[static_cast<size_t>(path_index)] = path_result_from_json(json::parse(read_zstd(checkpoint_path))); }
+        catch (const std::exception& error) { path_errors[static_cast<size_t>(path_index)] = error.what(); }
+        continue;
+      }
       const long long target_rounds = config.rounds / config.paths + (path_index < config.rounds % config.paths ? 1 : 0);
       std::mt19937_64 rng(hash_seed(config.seed + ":path:" + std::to_string(path_index)));
       PathResult result; result.ruined.assign(config.risk_bankroll_units.size(), false);
       double cumulative = 0.0, peak = 0.0;
       int running_count = 0, shoe_number = 0;
       Shoe shoe = full_shoe(strategy.rules.decks);
-      std::ostringstream raw;
+      std::unique_ptr<ZstdLineWriter> raw;
+      if (config.retention.mode != "aggregate")
+        raw = std::make_unique<ZstdLineWriter>(run_dir / "raw" / ("path-" + std::to_string(path_index) + ".jsonl.zst"));
       for (long long round = 0; round < target_rounds; ++round) {
         if (config.mode == "fresh-round") { shoe = full_shoe(strategy.rules.decks); running_count = 0; ++shoe_number; }
         else {
@@ -372,8 +461,8 @@ int run_evaluation(const EvaluationOptions& options) {
           running_count += observed.running_count_delta;
           result.stats.add_observed_round(); result.cubes[cube_key(tc, depth, 0.0)].add_observed_round();
           if (config.retention.mode == "full" || (config.retention.mode == "sampled" && round % config.retention.sample_every == 0))
-            raw << json({{"path", path_index}, {"round", round}, {"shoe", shoe_number}, {"trueCount", tc},
-                         {"depthPercent", depth}, {"wager", 0.0}, {"profit", 0.0}, {"observed", true}}).dump() << '\n';
+            raw->write(json({{"path", path_index}, {"round", round}, {"shoe", shoe_number}, {"trueCount", tc},
+                         {"depthPercent", depth}, {"wager", 0.0}, {"profit", 0.0}, {"observed", true}}).dump() + "\n");
           continue;
         }
         const auto outcome = play_complete_round(strategy.rules, policy, shoe, rng, running_count, wager);
@@ -384,14 +473,14 @@ int run_evaluation(const EvaluationOptions& options) {
         for (size_t i = 0; i < config.risk_bankroll_units.size(); ++i)
           if (cumulative <= -config.risk_bankroll_units[i]) result.ruined[i] = true;
         if (config.retention.mode == "full" || (config.retention.mode == "sampled" && round % config.retention.sample_every == 0))
-          raw << json({{"path", path_index}, {"round", round}, {"shoe", shoe_number}, {"trueCount", tc},
+          raw->write(json({{"path", path_index}, {"round", round}, {"shoe", shoe_number}, {"trueCount", tc},
                        {"depthPercent", depth}, {"wager", wager}, {"profit", outcome.profit},
                        {"exposure", outcome.total_exposure}, {"hands", outcome.hands},
                        {"playerBlackjack", outcome.player_blackjack}, {"dealerBlackjack", outcome.dealer_blackjack},
-                       {"insuranceTaken", outcome.insurance_taken}, {"evenMoneyTaken", outcome.even_money_taken}}).dump() << '\n';
+                       {"insuranceTaken", outcome.insurance_taken}, {"evenMoneyTaken", outcome.even_money_taken}}).dump() + "\n");
       }
-      if (config.retention.mode != "aggregate")
-        write_zstd(run_dir / "raw" / ("path-" + std::to_string(path_index) + ".jsonl.zst"), raw.str());
+      if (raw) raw->close();
+      write_zstd(checkpoint_path, path_result_json(result).dump());
       paths[static_cast<size_t>(path_index)] = std::move(result);
       } catch (const std::exception& error) {
         path_errors[static_cast<size_t>(path_index)] = error.what();
@@ -427,15 +516,15 @@ int run_evaluation(const EvaluationOptions& options) {
       {"pathEvs", path_evs}, {"paths", path_rows}, {"cubes", cube_rows}, {"risk", risk},
       {"maxDrawdownUnits", max_drawdown}};
     const json summary = summary_json(aggregate);
-    const json strategy_json = read_json_file(config.strategy_path);
-    const json config_json = read_json_file(options.config_path);
     const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::steady_clock::now() - started).count();
-    json manifest = {{"id", run_id}, {"createdAt", now_compact()}, {"elapsedMs", elapsed_ms},
-      {"evaluatorVersion", kEvaluatorVersion}, {"seed", config.seed}, {"workerThreads", omp_get_max_threads()},
-      {"config", config_json}, {"strategy", strategy_json},
-      {"artifacts", {{"aggregate", "aggregate-data.json.zst"}, {"summary", "summary.json"},
-                      {"rawMode", config.retention.mode}}}};
+    json manifest = read_json_file((run_dir / "manifest.json").string());
+    manifest["completedAt"] = now_compact();
+    manifest["status"] = "completed";
+    manifest["elapsedMs"] = elapsed_ms;
+    manifest["workerThreads"] = omp_get_max_threads();
+    manifest["artifacts"] = {{"aggregate", "aggregate-data.json.zst"}, {"summary", "summary.json"},
+                             {"rawMode", config.retention.mode}, {"checkpoints", "checkpoints/."}};
     std::ofstream(run_dir / "manifest.json") << std::setw(2) << manifest << '\n';
     std::ofstream(run_dir / "summary.json") << std::setw(2) << summary << '\n';
     write_zstd(run_dir / "aggregate-data.json.zst", aggregate.dump());

@@ -13,7 +13,7 @@ std::string value_after(const std::vector<std::string>& args, const std::string&
 
 void usage() {
   std::cout << "evaluate-strategy validate --strategy <package.json>\n"
-            << "evaluate-strategy run --config <run.json> [--output sim/evaluation-runs]\n"
+            << "evaluate-strategy run --config <run.json> [--output sim/evaluation-runs] [--resume <run-dir>]\n"
             << "evaluate-strategy summarize --run <run-dir>\n";
 }
 }  // namespace
@@ -30,6 +30,7 @@ int main(int argc, char** argv) {
     blackjack_sim::EvaluationOptions options;
     options.config_path = value_after(args, "--config");
     options.output_dir = value_after(args, "--output", options.output_dir);
+    options.resume_dir = value_after(args, "--resume");
     if (options.config_path.empty()) { std::cerr << "--config is required\n"; return 1; }
     return blackjack_sim::run_evaluation(options);
   }

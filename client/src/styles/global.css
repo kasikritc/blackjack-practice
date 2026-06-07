@@ -4337,7 +4337,6 @@ button:disabled {
   user-select: none;
 }
 
-
 .sim-run-title-row,
 .sim-run-rename {
   display: flex;
@@ -4384,4 +4383,27 @@ button:disabled {
   align-self: center;
   color: var(--muted);
   font-size: 0.75rem;
+}
+
+.sim-paired-difference {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.sim-paired-difference > div {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid rgba(235, 183, 70, 0.25);
+  border-radius: 10px;
+  background: rgba(235, 183, 70, 0.055);
+}
+
+.sim-paired-difference span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }

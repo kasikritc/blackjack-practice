@@ -3,6 +3,7 @@ import path from "node:path";
 import express, { type ErrorRequestHandler } from "express";
 import Database from "better-sqlite3";
 import type {
+  EvaluatorAggregateAnalysis,
   EvaluatorComparison,
   GeneratorComparison,
   SimulatorComparisonRequest,
@@ -101,7 +102,10 @@ function evaluatorComparison(
   left: StrategyEvaluationSummary,
   right: StrategyEvaluationSummary,
   leftConfig: Record<string, unknown>,
-  rightConfig: Record<string, unknown>
+  rightConfig: Record<string, unknown>,
+  leftAnalysis?: EvaluatorAggregateAnalysis,
+  rightAnalysis?: EvaluatorAggregateAnalysis,
+  rulesCompatible = true
 ): EvaluatorComparison {
   const metricKeys = [
     "playerEv",
@@ -128,7 +132,40 @@ function evaluatorComparison(
     leftConfig.paths === rightConfig.paths &&
     leftConfig.rounds === rightConfig.rounds &&
     leftConfig.mode === rightConfig.mode;
-  const compatible = left.mode === right.mode;
+  const compatible =
+    left.mode === right.mode &&
+    leftConfig.rounds === rightConfig.rounds &&
+    leftConfig.paths === rightConfig.paths &&
+    leftConfig.penetrationPercent === rightConfig.penetrationPercent &&
+    leftConfig.observerSeats === rightConfig.observerSeats &&
+    rulesCompatible;
+  let pairedDifference: EvaluatorComparison["pairedDifference"];
+  if (
+    paired &&
+    leftAnalysis &&
+    rightAnalysis &&
+    leftAnalysis.pathEvs.length === rightAnalysis.pathEvs.length &&
+    leftAnalysis.pathEvs.length > 0
+  ) {
+    const deltas = rightAnalysis.pathEvs.map((value, index) => value - leftAnalysis.pathEvs[index]);
+    const meanDelta = deltas.reduce((sum, value) => sum + value, 0) / deltas.length;
+    const variance =
+      deltas.length > 1
+        ? deltas.reduce((sum, value) => sum + (value - meanDelta) ** 2, 0) / (deltas.length - 1)
+        : 0;
+    const standardError = Math.sqrt(variance / deltas.length);
+    const z = leftAnalysis.confidenceZ || 1.96;
+    pairedDifference = {
+      paths: deltas.length,
+      meanDelta,
+      standardError,
+      confidenceLow: meanDelta - z * standardError,
+      confidenceHigh: meanDelta + z * standardError,
+      minimum: Math.min(...deltas),
+      maximum: Math.max(...deltas),
+      positivePaths: deltas.filter(value => value > 0).length
+    };
+  }
   return {
     workflow: "evaluator",
     compatible,
@@ -139,7 +176,8 @@ function evaluatorComparison(
     ],
     leftRunId,
     rightRunId,
-    metrics
+    metrics,
+    pairedDifference
   };
 }
 
@@ -307,7 +345,22 @@ export function createSimulatorApp(runner = new SimulatorRunner()) {
           left.evaluatorSummary,
           right.evaluatorSummary,
           left.config as unknown as Record<string, unknown>,
-          right.config as unknown as Record<string, unknown>
+          right.config as unknown as Record<string, unknown>,
+          (() => {
+            try {
+              return runner.evaluatorAnalysis(left.id);
+            } catch {
+              return undefined;
+            }
+          })(),
+          (() => {
+            try {
+              return runner.evaluatorAnalysis(right.id);
+            } catch {
+              return undefined;
+            }
+          })(),
+          JSON.stringify(left.strategy?.rules) === JSON.stringify(right.strategy?.rules)
         )
       );
     res.status(400).json({ error: "Both runs need completed summaries before comparison." });

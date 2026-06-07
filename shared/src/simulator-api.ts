@@ -312,6 +312,16 @@ export interface EvaluatorComparison {
   leftRunId: string;
   rightRunId: string;
   metrics: Record<string, { left: number; right: number; delta: number }>;
+  pairedDifference?: {
+    paths: number;
+    meanDelta: number;
+    standardError: number;
+    confidenceLow: number;
+    confidenceHigh: number;
+    minimum: number;
+    maximum: number;
+    positivePaths: number;
+  };
 }
 
 export type SimulatorComparison = GeneratorComparison | EvaluatorComparison;

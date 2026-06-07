@@ -99,6 +99,38 @@ function EvaluatorComparisonView({ comparison }: { comparison: EvaluatorComparis
           <strong>{comparison.rightRunId}</strong>
         </div>
       </div>
+      {comparison.pairedDifference ? (
+        <section className="sim-paired-difference">
+          <div>
+            <span>Mean paired EV delta</span>
+            <strong>{formatMetric(comparison.pairedDifference.meanDelta)}</strong>
+          </div>
+          <div>
+            <span>Paired interval</span>
+            <strong>
+              {formatMetric(comparison.pairedDifference.confidenceLow)} to{" "}
+              {formatMetric(comparison.pairedDifference.confidenceHigh)}
+            </strong>
+          </div>
+          <div>
+            <span>Standard error</span>
+            <strong>{formatMetric(comparison.pairedDifference.standardError)}</strong>
+          </div>
+          <div>
+            <span>Positive paths</span>
+            <strong>
+              {comparison.pairedDifference.positivePaths}/{comparison.pairedDifference.paths}
+            </strong>
+          </div>
+          <div>
+            <span>Path delta range</span>
+            <strong>
+              {formatMetric(comparison.pairedDifference.minimum)} to{" "}
+              {formatMetric(comparison.pairedDifference.maximum)}
+            </strong>
+          </div>
+        </section>
+      ) : null}
       <div className="sim-compare-metric-table">
         <div className="sim-compare-metric-head">
           <span>Metric</span>

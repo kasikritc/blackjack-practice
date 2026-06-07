@@ -25,3 +25,6 @@ dev.pid
 # Offline simulator build/output
 sim/build*/
 sim/runs/
+
+sim/evaluation-runs/
+sim/runs/.ui/

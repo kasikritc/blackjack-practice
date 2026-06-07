@@ -33,7 +33,9 @@
     "strategy:export": "tsx scripts/export-strategy-package.ts",
     "sim:test": "ctest --test-dir sim/build --output-on-failure",
     "sim:sanitize": "cmake -S sim -B sim/build-sanitize -DCMAKE_BUILD_TYPE=Debug -DSIM_ENABLE_SANITIZERS=ON && cmake --build sim/build-sanitize -j && ctest --test-dir sim/build-sanitize --output-on-failure",
-    "sim:check": "npm run sim:build && npm run sim:test && npm run sim:smoke"
+    "sim:check": "npm run sim:build && npm run sim:test && npm run sim:smoke",
+    "dev:sim": "npm run build:shared && npm run dev:sim -w @blackjack/server",
+    "start:sim": "npm run start:sim -w @blackjack/server"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

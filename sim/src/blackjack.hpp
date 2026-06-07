@@ -41,7 +41,12 @@ struct HandState {
   bool doubled = false;
 };
 
-struct Shoe { std::array<int, 13> counts{}; int total = 0; int decks = 6; };
+struct Shoe {
+  std::array<int, 13> counts{};
+  int total = 0;
+  int decks = 6;
+  std::vector<Rank> order;
+};
 
 struct RoundOutcome {
   double profit = 0.0;

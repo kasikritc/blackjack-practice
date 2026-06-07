@@ -268,7 +268,8 @@ class ZstdLineWriter {
 };
 
 ObserverOutcome play_observer_round(const Rules& rules, int seats, Shoe& shoe, std::mt19937_64& rng) {
-  const Shoe before = shoe;
+  const auto before_counts = shoe.counts;
+  const int before_total = shoe.total;
   const int seat_count = std::max(1, seats);
   std::vector<std::vector<Rank>> hands(static_cast<size_t>(seat_count));
   std::vector<Rank> dealer;
@@ -280,9 +281,9 @@ ObserverOutcome play_observer_round(const Rules& rules, int seats, Shoe& shoe, s
     while (hand_value(hand).total < 17) hand.push_back(draw_card(shoe, rng));
   while (dealer_should_hit(dealer, rules)) dealer.push_back(draw_card(shoe, rng));
   ObserverOutcome outcome;
-  outcome.cards_consumed = before.total - shoe.total;
-  for (int i = 0; i < static_cast<int>(before.counts.size()); ++i)
-    outcome.running_count_delta += (before.counts[i] - shoe.counts[i]) * hi_lo_value(static_cast<Rank>(i));
+  outcome.cards_consumed = before_total - shoe.total;
+  for (int i = 0; i < static_cast<int>(before_counts.size()); ++i)
+    outcome.running_count_delta += (before_counts[i] - shoe.counts[i]) * hi_lo_value(static_cast<Rank>(i));
   return outcome;
 }
 

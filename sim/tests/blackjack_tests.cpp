@@ -29,6 +29,21 @@ void test_pairs_and_shoe() {
   check(shoe.total == 51 && shoe.counts[12] == 3, "rank removal");
 }
 
+void test_shoe_order_is_stable_across_consumption() {
+  std::mt19937_64 short_rng(1234);
+  std::mt19937_64 long_rng(1234);
+  Shoe short_first = full_shoe(1);
+  Shoe long_first = full_shoe(1);
+  for (int i = 0; i < 5; ++i) (void)draw_card(short_first, short_rng);
+  for (int i = 0; i < 25; ++i) (void)draw_card(long_first, long_rng);
+
+  Shoe short_second = full_shoe(1);
+  Shoe long_second = full_shoe(1);
+  for (int i = 0; i < 52; ++i)
+    check(draw_card(short_second, short_rng) == draw_card(long_second, long_rng),
+          "same seed keeps later physical shoes identical");
+}
+
 void test_action_legality() {
   Rules rules;
   HandState hand{{Rank::Five, Rank::Six}};
@@ -228,6 +243,7 @@ int main() {
   try {
     test_hand_values();
     test_pairs_and_shoe();
+    test_shoe_order_is_stable_across_consumption();
     test_action_legality();
     test_split_ace_lock();
     test_natural_identity();

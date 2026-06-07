@@ -139,6 +139,13 @@ Shoe full_shoe(int decks) {
 bool remove_card(Shoe& shoe, Rank rank) {
   int& count = shoe.counts[rank_index(rank)];
   if (count <= 0) return false;
+  if (shoe.order.size() == static_cast<size_t>(shoe.total)) {
+    const auto ordered = std::find(shoe.order.begin(), shoe.order.end(), rank);
+    if (ordered == shoe.order.end()) throw std::logic_error("shoe order invariant violated");
+    shoe.order.erase(ordered);
+  } else {
+    shoe.order.clear();
+  }
   --count;
   --shoe.total;
   return true;
@@ -146,17 +153,19 @@ bool remove_card(Shoe& shoe, Rank rank) {
 
 Rank draw_card(Shoe& shoe, std::mt19937_64& rng) {
   if (shoe.total <= 0) throw std::runtime_error("cannot draw from an empty shoe");
-  std::uniform_int_distribution<int> dist(0, shoe.total - 1);
-  int pick = dist(rng);
-  for (int i = 0; i < static_cast<int>(shoe.counts.size()); ++i) {
-    if (pick < shoe.counts[i]) {
-      --shoe.counts[i];
-      --shoe.total;
-      return static_cast<Rank>(i);
-    }
-    pick -= shoe.counts[i];
+  if (shoe.order.size() != static_cast<size_t>(shoe.total)) {
+    shoe.order.clear();
+    shoe.order.reserve(static_cast<size_t>(shoe.total));
+    for (int i = 0; i < static_cast<int>(shoe.counts.size()); ++i)
+      for (int count = 0; count < shoe.counts[i]; ++count)
+        shoe.order.push_back(static_cast<Rank>(i));
+    std::shuffle(shoe.order.begin(), shoe.order.end(), rng);
   }
-  throw std::logic_error("shoe count invariant violated");
+  const Rank rank = shoe.order.back();
+  shoe.order.pop_back();
+  --shoe.counts[rank_index(rank)];
+  --shoe.total;
+  return rank;
 }
 
 std::vector<Action> legal_actions(const HandState& hand, const Rules& rules, int total_hands,
@@ -258,15 +267,16 @@ CompleteRoundOutcome play_complete_round(const Rules& rules, const CompletePolic
   if (initial_wager <= 0.0) throw std::invalid_argument("initial wager must be positive");
   if (shoe.total < 15) throw std::runtime_error("insufficient cards for a complete round");
 
-  const Shoe before = shoe;
+  const auto before_counts = shoe.counts;
+  const int before_total = shoe.total;
   HandState player{{draw_card(shoe, rng)}, initial_wager};
   std::vector<Rank> dealer{draw_card(shoe, rng)};
   player.cards.push_back(draw_card(shoe, rng));
   dealer.push_back(draw_card(shoe, rng));
   const auto visible_running_count = [&]() {
     int count = running_count;
-    for (int i = 0; i < static_cast<int>(before.counts.size()); ++i) {
-      const int consumed = before.counts[i] - shoe.counts[i];
+    for (int i = 0; i < static_cast<int>(before_counts.size()); ++i) {
+      const int consumed = before_counts[i] - shoe.counts[i];
       count += consumed * hi_lo_value(static_cast<Rank>(i));
     }
     return count - hi_lo_value(dealer[1]);
@@ -297,9 +307,9 @@ CompleteRoundOutcome play_complete_round(const Rules& rules, const CompletePolic
   }
 
   auto finish = [&]() {
-    out.cards_consumed = before.total - shoe.total;
-    for (int i = 0; i < static_cast<int>(before.counts.size()); ++i) {
-      const int consumed = before.counts[i] - shoe.counts[i];
+    out.cards_consumed = before_total - shoe.total;
+    for (int i = 0; i < static_cast<int>(before_counts.size()); ++i) {
+      const int consumed = before_counts[i] - shoe.counts[i];
       out.running_count_delta += consumed * hi_lo_value(static_cast<Rank>(i));
     }
     return out;

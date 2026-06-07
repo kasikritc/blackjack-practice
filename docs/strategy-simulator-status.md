@@ -20,19 +20,20 @@
 - Reproducible path-seeded parallel runs with completed-path checkpoints and resume validation.
 - EV, house edge, path confidence intervals, variance, hourly EV, outcome rates, finite-horizon risk of ruin, drawdown, and count/depth/wager breakdowns.
 - Compressed aggregate, sampled, and full raw artifacts designed for post-run metric computation.
+- Dedicated simulator service and desktop workstation for configuring, queueing, monitoring, cancelling, recovering, comparing, retaining, and importing runs.
+- Guided fixed presets plus complete visual Expert controls for both native workflows.
+- Searchable generator composition/count/insurance evidence and evaluator path/cube evidence.
+- Two-run or cross-bucket comparisons, including paired evaluator path differences.
 
 The currently import-validated profile is six-deck H17, DAS, late surrender, 3:2, four split hands,
 no resplit aces, one-card split aces, and exact-rank ten splitting. Other structurally supported
 rule combinations remain non-importable until dedicated conformance fixtures are added.
 
-## Remaining Work
+## Remaining Native Work
 
 - GPU rollout kernels; CUDA currently remains a device/build probe only.
-- A client UI for browsing run evidence and selecting import packages.
 - Dedicated reference fixtures for each additional rule profile before enabling its import flag.
 - Counterfactual EV evaluation for every observed multi-card continuation composition. Current
   continuation evidence records the frozen policy action and observation frequency; starting
   compositions include per-action EV aggregates.
 - More efficient rare-count reachable-shoe generation for extreme penetration/count requests.
-- Server job orchestration and UI integration for configuring, monitoring, and viewing evaluation runs.
-- A dedicated paired strategy-comparison report over identical path streams.

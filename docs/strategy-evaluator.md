@@ -59,7 +59,7 @@ Modes:
 - `fresh-round`: starts a newly shuffled full shoe and resets the count for every table round.
 - `continuous-shoe`: reuses each shoe until `penetrationPercent`, then shuffles and resets the count. A zero-unit ramp step observes table rounds through `observerSeats` so the count can reach a future betting threshold.
 
-The `seed` and path index determine each random stream. Results do not depend on the OpenMP worker count, so separate strategies can use the same config seed and path structure for reproducible common scenarios. A dedicated paired-comparison report is not part of the CLI yet.
+The `seed` and path index determine each random stream. Results do not depend on the OpenMP worker count, so separate strategies can use the same config seed and path structure for reproducible common scenarios. The desktop workstation computes paired path-difference evidence when two runs share the same seed and path structure.
 
 ## Results
 
@@ -91,6 +91,6 @@ sim/build/evaluate-strategy run \
 
 Resume rejects any config or strategy content change. Completed path checkpoints are reused; missing paths are recomputed from their deterministic seeds.
 
-## Current boundary
+## Service and UI
 
-This release is CLI-first and evaluates one tracked player strategy per run. The artifact and shared TypeScript contracts are UI-neutral so a later server/UI layer can submit runs and render existing artifacts without changing the simulation core. No UI or background job service is included yet.
+The CLI remains the direct native interface. The dedicated simulator service and desktop workstation expose the same strict workload with durable queueing, cancellation, checkpoint recovery, retained runs, evidence browsing, and comparison. See [`simulator-workstation.md`](./simulator-workstation.md).

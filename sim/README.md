@@ -1,51 +1,75 @@
 # Offline Strategy Simulator
 
-Native Monte Carlo strategy-chart generator for blackjack rule profiles.
+Native CPU Monte Carlo strategy generator for American hole-card blackjack with dealer peek.
+The current artifact version is `0.3.0`.
 
-Current simulator artifact version: `0.2.1`.
-
-## Build
+## Build and verify
 
 ```bash
 npm run sim:configure
 npm run sim:build
+npm run sim:test
+npm run sim:smoke
+npm run sim:sanitize
 ```
+
+`sim:sanitize` creates an ignored `sim/build-sanitize/` tree and runs the native tests with
+AddressSanitizer and UndefinedBehaviorSanitizer.
 
 ## Run
 
-```bash
-sim/build/simulate-strategy run --config sim/configs/smoke.json --output sim/runs
-sim/build/simulate-strategy export-chart --run sim/runs/<run-id>
-```
-
-To convert `chart.json` into a PNG, use the repo helper:
+Every production sampling limit is explicit in the config. The checked-in baseline profile is:
 
 ```bash
-npm run sim:export-png -- --chart sim/runs/<run-id>/chart.json --output sim/runs/<run-id>/chart.png
+sim/build/simulate-strategy run \
+  --config sim/configs/baseline-6d-h17-das-ls.json \
+  --output sim/runs
 ```
 
-You can also point it at the run directory and let it use the default output path:
+The smoke configs use intentionally tiny limits and are expected to produce unconverged,
+non-importable packages.
 
-```bash
-npm run sim:export-png -- --run sim/runs/<run-id>
-```
+## Configuration
 
-The simulator writes aggregate artifacts only: `manifest.json`, `chart.json`, `summary.csv`, and `results.sqlite`. It does not store individual hand histories.
+A config contains a complete `StrategyRules` object plus:
 
-The first implementation includes a deterministic CPU engine and a compiled CUDA probe target. GPU rollout kernels should extend the same aggregate schema without changing the app import contract.
+- `minSamplesPerAction`, `maxSamplesPerAction`, and `batchSize`
+- `shoeSamplesPerBucket`
+- `maxPolicyIterations`
+- `minimumEvMargin` and `confidenceZ`
+- `trueCountBuckets` and `decksRemainingBuckets`
+- `trueCountRounding`: `nearest` or `truncate`
 
-## Sampling knobs
+The simulator rejects unknown fields, no-peek/no-hole-card games, non-empty `customRules`, and
+contradictory split-ace settings. The default documented count mapping is nearest integer, while
+exact running-count strata are retained for later analysis.
 
-`samplesPerAction` controls how many top-level trials are run for each legal first action in each chart cell. Increase this to reduce variance in the action EV estimates.
+## Model
 
-`policySamplesPerDecision` controls how much Monte Carlo sampling is used for recursive continuation decisions after the tested first action. It defaults to `6` and is intentionally independent from `samplesPerAction`, so large top-level runs scale roughly linearly instead of expanding the recursive decision tree at every depth.
+- Uses 13 distinct ranks and a finite shared shoe.
+- Resolves American peek timing before late-surrender play decisions.
+- Distinguishes naturals from split or multi-card 21.
+- Plays all split hands from one shoe against one dealer result.
+- Enforces DAS, double restrictions, global split limits, ace rules, and ten-pair rules.
+- Evaluates first actions with paired common-random-number rollouts against a frozen continuation
+  policy, then improves that policy between iterations.
+- Stops a cell only when the paired 95% lower confidence bound exceeds `minimumEvMargin`, or when
+  the configured sample cap is reached.
+- Samples reachable shoes at the player decision point after the player cards and upcard are known.
 
-For first-principles validation, increase `policySamplesPerDecision` separately and compare output stability. For high-volume runs, keep it fixed and scale `samplesPerAction`.
+## Artifacts
 
-## Current implementation notes
+Each run writes:
 
-- The checked-in smoke config uses a low sample count to validate artifact generation quickly. Increase `samplesPerAction` for lower-variance action EV estimates.
-- The CPU engine is deterministic for a given seed/config and writes aggregate statistics only.
-- v1 records true-count/decks-remaining buckets in artifacts but does not yet condition the shoe composition from a running-count distribution.
-- v1 uses recursive Monte Carlo rollouts for later decisions. `policySamplesPerDecision` controls that continuation budget, but the engine does not yet run multi-iteration convergence checks; generated cell records are marked `converged: false`.
-- The CUDA target currently verifies runtime availability and is the extension point for GPU rollout kernels.
+- `manifest.json`
+- `simulation-summary.json`
+- `chart.json` and `import-package.json` for single-bucket runs
+- `charts/*.json` and `charts/*.import-package.json` for every bucket
+- `composition-evidence.json`, including starting counterfactual aggregates and all observed
+  continuation compositions
+- `count-strata-results.json` for exact running-count re-bucketing
+- `insurance-results.json` for the independent insurance/even-money decision
+
+Individual hand histories are never persisted. The application rejects packages unless the rule
+profile is validated, every required cell is present and converged, and chart actions match the
+cell evidence.

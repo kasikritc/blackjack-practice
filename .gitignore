@@ -23,5 +23,5 @@ dev.pid
 !.vscode/extensions.json
 
 # Offline simulator build/output
-sim/build/
+sim/build*/
 sim/runs/

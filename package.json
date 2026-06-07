@@ -25,7 +25,10 @@
     "sim:build": "cmake --build sim/build -j",
     "sim:devices": "sim/build/simulate-strategy devices",
     "sim:smoke": "sim/build/simulate-strategy run --config sim/configs/smoke.json --output /tmp/blackjack-sim-runs",
-    "sim:export-png": "tsx scripts/export-chart-png.ts"
+    "sim:export-png": "tsx scripts/export-chart-png.ts",
+    "sim:test": "ctest --test-dir sim/build --output-on-failure",
+    "sim:sanitize": "cmake -S sim -B sim/build-sanitize -DCMAKE_BUILD_TYPE=Debug -DSIM_ENABLE_SANITIZERS=ON && cmake --build sim/build-sanitize -j && ctest --test-dir sim/build-sanitize --output-on-failure",
+    "sim:check": "npm run sim:build && npm run sim:test && npm run sim:smoke"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

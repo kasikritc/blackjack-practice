@@ -19,9 +19,7 @@ if (!runDir && !chartFile) {
   process.exit(1);
 }
 
-const chartPath = chartFile
-  ? resolve(chartFile)
-  : join(resolve(runDir!), "chart.json");
+const chartPath = chartFile ? resolve(chartFile) : join(resolve(runDir!), "chart.json");
 
 if (!existsSync(chartPath)) {
   console.error(`chart.json not found: ${chartPath}`);
@@ -40,7 +38,9 @@ if (manifestPath && existsSync(manifestPath)) {
     const m = JSON.parse(readFileSync(manifestPath, "utf8"));
     if (m.name) title = m.name;
     else if (m.config?.name) title = m.config.name;
-  } catch {}
+  } catch {
+    // Keep the default title when optional manifest metadata is malformed.
+  }
 }
 
 const outputPath =
@@ -56,7 +56,7 @@ const ABBREV: Record<string, string> = {
   stand: "S",
   double: "D",
   split: "P",
-  surrender: "R",
+  surrender: "R"
 };
 
 const HARD_ROWS = Array.from({ length: 18 }, (_, i) => {
@@ -70,9 +70,9 @@ const SOFT_ROWS = Array.from({ length: 9 }, (_, i) => {
 });
 
 const PAIR_ORDER = ["A", "10", "9", "8", "7", "6", "5", "4", "3", "2"];
-const PAIR_ROWS = PAIR_ORDER.map((v) => ({
+const PAIR_ROWS = PAIR_ORDER.map(v => ({
   key: `p${v}`,
-  label: v === "A" ? "A,A" : `${v},${v}`,
+  label: v === "A" ? "A,A" : `${v},${v}`
 }));
 
 // --- HTML builder ---
@@ -85,7 +85,7 @@ function buildTable(
   const cells = chart[section] ?? {};
 
   const headerCols = DEALERS.map(
-    (d) => `<th><div class="strategy-column-toggle">${d}</div></th>`
+    d => `<th><div class="strategy-column-toggle">${d}</div></th>`
   ).join("");
 
   const sectionRow = `
@@ -98,7 +98,7 @@ function buildTable(
   const dataRows = rows
     .map(({ key, label: rowLabel }) => {
       const rowData = cells[key] ?? {};
-      const tds = DEALERS.map((d) => {
+      const tds = DEALERS.map(d => {
         const action = rowData[d] ?? "";
         const abbrev = ABBREV[action] ?? "";
         const cls = action ? ` action-${action}` : "";
@@ -133,7 +133,7 @@ const LEGEND_ACTIONS: [string, string][] = [
   ["stand", "Stand"],
   ["double", "Double"],
   ["split", "Split"],
-  ["surrender", "Surrender"],
+  ["surrender", "Surrender"]
 ];
 
 const legendHtml = LEGEND_ACTIONS.map(

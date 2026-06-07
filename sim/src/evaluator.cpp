@@ -4,7 +4,9 @@
 #include "strategy_package.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <csignal>
 #include <cctype>
 #include <cmath>
 #include <filesystem>
@@ -28,6 +30,9 @@ namespace blackjack_sim {
 namespace {
 using json = nlohmann::json;
 constexpr const char* kEvaluatorVersion = "0.2.0";
+volatile std::sig_atomic_t g_cancel_requested = 0;
+
+void request_cancel(int) { g_cancel_requested = 1; }
 
 struct RetentionConfig {
   std::string mode = "aggregate";
@@ -398,6 +403,9 @@ int validate_evaluation_strategy(const std::string& strategy_path) {
 
 int run_evaluation(const EvaluationOptions& options) {
   try {
+    g_cancel_requested = 0;
+    std::signal(SIGTERM, request_cancel);
+    std::signal(SIGINT, request_cancel);
     const auto started = std::chrono::steady_clock::now();
     const EvaluationConfig config = parse_evaluation_config(options.config_path);
     const std::string strategy_path = resolve_strategy_path(config.strategy_path);
@@ -439,17 +447,27 @@ int run_evaluation(const EvaluationOptions& options) {
     if (config.retention.mode != "aggregate") std::filesystem::create_directories(run_dir / "raw");
     std::vector<PathResult> paths(static_cast<size_t>(config.paths));
     std::vector<std::string> path_errors(static_cast<size_t>(config.paths));
+    std::atomic<int> completed_paths{0};
+    std::atomic<long long> completed_rounds{0};
 
     #pragma omp parallel for schedule(static)
     for (int path_index = 0; path_index < config.paths; ++path_index) {
       try {
+      if (g_cancel_requested) continue;
+      const long long target_rounds = config.rounds / config.paths + (path_index < config.rounds % config.paths ? 1 : 0);
       const auto checkpoint_path = run_dir / "checkpoints" / ("path-" + std::to_string(path_index) + ".json.zst");
       if (std::filesystem::exists(checkpoint_path)) {
-        try { paths[static_cast<size_t>(path_index)] = path_result_from_json(json::parse(read_zstd(checkpoint_path))); }
-        catch (const std::exception& error) { path_errors[static_cast<size_t>(path_index)] = error.what(); }
+        try {
+          paths[static_cast<size_t>(path_index)] = path_result_from_json(json::parse(read_zstd(checkpoint_path)));
+          const int done = ++completed_paths;
+          const long long rounds_done = completed_rounds.fetch_add(target_rounds) + target_rounds;
+          #pragma omp critical(eval_progress_output)
+          std::cerr << "SIM_PROGRESS " << json({{"workflow", "evaluator"},
+            {"completedPaths", done}, {"totalPaths", config.paths},
+            {"completedRounds", rounds_done}, {"totalRounds", config.rounds}}).dump() << '\n';
+        } catch (const std::exception& error) { path_errors[static_cast<size_t>(path_index)] = error.what(); }
         continue;
       }
-      const long long target_rounds = config.rounds / config.paths + (path_index < config.rounds % config.paths ? 1 : 0);
       std::mt19937_64 rng(hash_seed(config.seed + ":path:" + std::to_string(path_index)));
       PathResult result; result.ruined.assign(config.risk_bankroll_units.size(), false);
       double cumulative = 0.0, peak = 0.0;
@@ -459,6 +477,7 @@ int run_evaluation(const EvaluationOptions& options) {
       if (config.retention.mode != "aggregate")
         raw = std::make_unique<ZstdLineWriter>(run_dir / "raw" / ("path-" + std::to_string(path_index) + ".jsonl.zst"));
       for (long long round = 0; round < target_rounds; ++round) {
+        if (g_cancel_requested) break;
         if (config.mode == "fresh-round") { shoe = full_shoe(strategy.rules.decks); running_count = 0; ++shoe_number; }
         else {
           const int dealt = strategy.rules.decks * 52 - shoe.total;
@@ -509,13 +528,35 @@ int run_evaluation(const EvaluationOptions& options) {
                        {"evenMoneyTaken", outcome.even_money_taken}, {"observed", false}}).dump() + "\n");
       }
       if (raw) raw->close();
+      if (g_cancel_requested) {
+        if (config.retention.mode != "aggregate")
+          std::filesystem::remove(run_dir / "raw" / ("path-" + std::to_string(path_index) + ".jsonl.zst"));
+        continue;
+      }
       write_zstd(checkpoint_path, path_result_json(result).dump());
       paths[static_cast<size_t>(path_index)] = std::move(result);
+      const int done = ++completed_paths;
+      const long long rounds_done = completed_rounds.fetch_add(target_rounds) + target_rounds;
+      #pragma omp critical(eval_progress_output)
+      std::cerr << "SIM_PROGRESS " << json({{"workflow", "evaluator"},
+        {"completedPaths", done}, {"totalPaths", config.paths},
+        {"completedRounds", rounds_done}, {"totalRounds", config.rounds}}).dump() << '\n';
       } catch (const std::exception& error) {
         path_errors[static_cast<size_t>(path_index)] = error.what();
       } catch (...) {
         path_errors[static_cast<size_t>(path_index)] = "unknown evaluator worker error";
       }
+    }
+
+    if (g_cancel_requested) {
+      json manifest = read_json_file((run_dir / "manifest.json").string());
+      manifest["completedAt"] = now_compact();
+      manifest["status"] = "cancelled";
+      manifest["elapsedMs"] = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - started).count();
+      std::ofstream(run_dir / "manifest.json") << std::setw(2) << manifest << '\n';
+      std::cout << run_dir.string() << '\n';
+      return 130;
     }
 
     for (size_t i = 0; i < path_errors.size(); ++i)

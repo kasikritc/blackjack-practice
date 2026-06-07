@@ -4,7 +4,9 @@
 #include "config.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <csignal>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -26,6 +28,9 @@ namespace {
 
 using json = nlohmann::json;
 constexpr const char* kSimulatorVersion = "0.3.0";
+volatile std::sig_atomic_t g_cancel_requested = 0;
+
+void request_cancel(int) { g_cancel_requested = 1; }
 
 struct RunningStats {
   long long samples = 0;
@@ -389,6 +394,7 @@ CellResult simulate_cell(const Config& config, const std::string& category,
     auto rng = make_rng(config, category + row_key + cell.dealer + ":shoe:" + std::to_string(ci) +
                         ":" + std::to_string(true_count) + ":" + std::to_string(decks_remaining), 0);
     for (int i = 0; i < config.shoe_samples_per_bucket; ++i) {
+      if (g_cancel_requested) return cell;
       auto sample = sample_reachable_shoe(config, compositions[ci].cards, dealer, true_count,
                                           decks_remaining, rng);
       exact_tc_sum += sample.exact_true_count;
@@ -402,7 +408,7 @@ CellResult simulate_cell(const Config& config, const std::string& category,
   std::vector<std::vector<RunningStats>> paired(actions.size(),
                                                 std::vector<RunningStats>(actions.size()));
   long long completed = 0;
-  while (completed < config.max_samples_per_action) {
+  while (completed < config.max_samples_per_action && !g_cancel_requested) {
     const int batch = std::min(config.batch_size,
                                config.max_samples_per_action - static_cast<int>(completed));
     for (int offset = 0; offset < batch; ++offset) {
@@ -548,7 +554,8 @@ void write_artifacts(const Config& config, const std::vector<CellResult>& cells,
                      const std::filesystem::path& run_dir, const std::string& run_id,
                      long long elapsed_ms) {
   const std::string created = now_compact();
-  json manifest = {{"id", run_id}, {"createdAt", created}, {"elapsedMs", elapsed_ms},
+  json manifest = {{"id", run_id}, {"createdAt", created}, {"completedAt", created},
+                   {"status", "completed"}, {"elapsedMs", elapsed_ms},
                    {"simulatorVersion", kSimulatorVersion}, {"config", config_json(config)},
                    {"capabilities", {{"gameFamily", "american-peek"},
                                       {"totalDependent", true}, {"compositionEvidence", true},
@@ -649,17 +656,27 @@ void write_artifacts(const Config& config, const std::vector<CellResult>& cells,
 
 int run_simulation(const RunOptions& options) {
   try {
+    g_cancel_requested = 0;
+    std::signal(SIGTERM, request_cancel);
+    std::signal(SIGINT, request_cancel);
     const auto start = std::chrono::steady_clock::now();
     const Config config = parse_config(options.config_path);
     const std::string run_id = slug(config.name) + "-" + now_compact();
     const std::filesystem::path run_dir = std::filesystem::path(options.output_dir) / run_id;
     std::filesystem::create_directories(run_dir);
+    json initial_manifest = {{"id", run_id}, {"createdAt", now_compact()}, {"status", "running"},
+                             {"simulatorVersion", kSimulatorVersion}, {"config", config_json(config)},
+                             {"hardware", {{"workerThreads", omp_get_max_threads()}}}};
+    std::ofstream(run_dir / "manifest.json") << std::setw(2) << initial_manifest << '\n';
     std::vector<CellResult> final_cells;
     const auto row_list = rows();
     const auto dealers = dealer_ranks();
 
+    const int bucket_count = static_cast<int>(config.true_count_buckets.size() * config.decks_remaining_buckets.size());
+    int bucket_index = 0;
     for (int tc : config.true_count_buckets) {
       for (double decks : config.decks_remaining_buckets) {
+        ++bucket_index;
         std::unordered_map<std::string, Action> policy_actions;
         std::vector<CellResult> bucket_cells;
         bool policy_stable = false;
@@ -667,12 +684,45 @@ int run_simulation(const RunOptions& options) {
           FrozenPolicy policy(policy_actions);
           const int total = static_cast<int>(row_list.size() * dealers.size());
           bucket_cells.assign(total, {});
+          std::atomic<int> completed_cells{0};
+          std::atomic<int> converged_cells{0};
+          std::cerr << "SIM_PROGRESS " << json({{"workflow", "generator"}, {"trueCount", tc},
+            {"decksRemaining", decks}, {"bucketIndex", bucket_index}, {"bucketCount", bucket_count},
+            {"policyIteration", iteration}, {"maxPolicyIterations", config.max_policy_iterations},
+            {"completedCells", 0}, {"totalCells", total}, {"convergedCells", 0}}).dump() << '\n';
           #pragma omp parallel for schedule(dynamic, 1)
           for (int index = 0; index < total; ++index) {
+            if (g_cancel_requested) continue;
             const auto& [category, row_key] = row_list[index / static_cast<int>(dealers.size())];
             const Rank dealer = dealers[index % dealers.size()];
             bucket_cells[index] = simulate_cell(config, category, row_key, dealer, tc, decks,
                                                 policy, iteration);
+            const int done = ++completed_cells;
+            const auto& progress_cell = bucket_cells[index];
+            const int converged = progress_cell.converged ? ++converged_cells : converged_cells.load();
+            #pragma omp critical(sim_progress_output)
+            std::cerr << "SIM_PROGRESS " << json({{"workflow", "generator"}, {"trueCount", tc},
+              {"decksRemaining", decks}, {"bucketIndex", bucket_index}, {"bucketCount", bucket_count},
+              {"policyIteration", iteration}, {"maxPolicyIterations", config.max_policy_iterations},
+              {"completedCells", done}, {"totalCells", total}, {"convergedCells", converged},
+              {"currentCell", {{"category", progress_cell.category}, {"rowKey", progress_cell.row_key},
+                {"dealerUpcard", progress_cell.dealer},
+                {"samples", progress_cell.actions.empty() ? 0 : progress_cell.actions.front().stats.samples},
+                {"bestAction", action_name(progress_cell.best_action)},
+                {"winnerMargin", progress_cell.winner_margin},
+                {"pairedConfidenceLow", progress_cell.paired_confidence_low},
+                {"pairedConfidenceHigh", progress_cell.paired_confidence_high},
+                {"converged", progress_cell.converged}, {"stopReason", progress_cell.stop_reason}}}}).dump() << '\n';
+          }
+          if (g_cancel_requested) {
+            json manifest = initial_manifest;
+            manifest["status"] = "cancelled";
+            manifest["completedAt"] = now_compact();
+            manifest["elapsedMs"] = std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - start).count();
+            std::ofstream(run_dir / "manifest.json") << std::setw(2) << manifest << '\n';
+            std::cout << run_dir.string() << '\n';
+            return 130;
           }
           bool stable = true;
           for (const auto& cell : bucket_cells) {

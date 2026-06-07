@@ -133,6 +133,34 @@ struct CompleteStandPolicy final : CompletePolicy {
   Action choose_action(const DecisionContext&) const override { return Action::Stand; }
 };
 
+struct CountTrackingPolicy final : CompletePolicy {
+  mutable std::vector<int> counts;
+  mutable std::vector<double> decks_remaining;
+
+  Action choose_action(const DecisionContext& context) const override {
+    counts.push_back(context.running_count);
+    decks_remaining.push_back(context.decks_remaining);
+    return counts.size() == 1 ? Action::Hit : Action::Stand;
+  }
+};
+
+void test_complete_round_updates_visible_count() {
+  CountTrackingPolicy policy;
+  Rules rules;
+  rules.surrender = "none";
+  Shoe shoe = exact_shoe({Rank::Two, Rank::Two, Rank::Two, Rank::Two, Rank::Two,
+                          Rank::Two, Rank::Two, Rank::Two, Rank::Two, Rank::Two,
+                          Rank::Two, Rank::Two, Rank::Two, Rank::Two, Rank::Two});
+  std::mt19937_64 rng(17);
+  (void)play_complete_round(rules, policy, shoe, rng, 0);
+  check(policy.counts.size() == 2, "two player decisions observed");
+  check(policy.counts[0] == 3 && policy.counts[1] == 4,
+        "newly visible hit card updates decision count");
+  check(policy.decks_remaining[0] == 12.0 / 52.0 &&
+        policy.decks_remaining[1] == 11.0 / 52.0,
+        "hidden dealer hole remains in unseen decks");
+}
+
 struct CompleteSplitPolicy final : CompletePolicy {
   Action choose_action(const DecisionContext& context) const override {
     return std::find(context.legal_actions.begin(), context.legal_actions.end(), Action::Split) !=
@@ -208,6 +236,7 @@ int main() {
     test_split_variations();
     test_peek_and_surrender_timing();
     test_complete_round_push_and_count();
+    test_complete_round_updates_visible_count();
     test_complete_round_preserves_split_wager();
     test_complete_round_rejects_illegal_policy();
     std::cout << "blackjack tests passed\n";

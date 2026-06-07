@@ -263,9 +263,19 @@ CompleteRoundOutcome play_complete_round(const Rules& rules, const CompletePolic
   std::vector<Rank> dealer{draw_card(shoe, rng)};
   player.cards.push_back(draw_card(shoe, rng));
   dealer.push_back(draw_card(shoe, rng));
-  const int decision_count = running_count + hi_lo_value(player.cards[0]) +
-    hi_lo_value(player.cards[1]) + hi_lo_value(dealer.front());
-  const double decision_decks = static_cast<double>(shoe.total) / 52.0;
+  const auto visible_running_count = [&]() {
+    int count = running_count;
+    for (int i = 0; i < static_cast<int>(before.counts.size()); ++i) {
+      const int consumed = before.counts[i] - shoe.counts[i];
+      count += consumed * hi_lo_value(static_cast<Rank>(i));
+    }
+    return count - hi_lo_value(dealer[1]);
+  };
+  const auto visible_decks_remaining = [&]() {
+    return static_cast<double>(shoe.total + 1) / 52.0;
+  };
+  const int decision_count = visible_running_count();
+  const double decision_decks = visible_decks_remaining();
   const double decision_true_count = decision_count / decision_decks;
 
   CompleteRoundOutcome out;
@@ -298,8 +308,10 @@ CompleteRoundOutcome play_complete_round(const Rules& rules, const CompletePolic
   const auto choose = [&](const HandState& hand, int total_hands, bool initial) {
     const auto legal = legal_actions(hand, rules, total_hands, initial);
     if (legal.empty()) throw std::logic_error("policy requested for terminal hand");
+    const int visible_count = visible_running_count();
+    const double decks_remaining = visible_decks_remaining();
     const DecisionContext context{hand, dealer.front(), rules, legal, total_hands, initial,
-                                  decision_count, decision_decks, decision_true_count};
+                                  visible_count, decks_remaining, visible_count / decks_remaining};
     const Action action = policy.choose_action(context);
     if (!contains(legal, action))
       throw std::invalid_argument("strategy selected illegal action: " + action_name(action));

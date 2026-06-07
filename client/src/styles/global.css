@@ -2357,3 +2357,368 @@ button:disabled {
   margin: 4px 0 10px;
   font-size: 26px;
 }
+
+.sim-builder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: start;
+}
+
+.sim-builder-main {
+  display: grid;
+  gap: 14px;
+}
+
+.sim-builder-sidebar {
+  position: sticky;
+  top: 16px;
+}
+
+.sim-builder-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 24px;
+  border-color: rgba(217, 180, 90, 0.3);
+}
+
+.sim-builder-intro div:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.sim-builder-intro h2 {
+  font-size: 26px;
+}
+
+.sim-builder-intro p:last-child {
+  max-width: 780px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.sim-expert-switch {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sim-expert-switch input,
+.sim-toggle-field input {
+  accent-color: var(--gold);
+}
+
+.sim-section {
+  padding: 22px 24px 24px;
+}
+
+.sim-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.sim-section-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sim-section-heading h3 {
+  font-size: 17px;
+}
+
+.sim-section-heading small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sim-step {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(217, 180, 90, 0.5);
+  border-radius: 50%;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.sim-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.sim-preset-card {
+  display: grid;
+  gap: 7px;
+  min-height: 126px;
+  padding: 15px;
+  text-align: left;
+  color: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.sim-preset-card:hover {
+  border-color: rgba(217, 180, 90, 0.55);
+}
+
+.sim-preset-card.is-selected {
+  border-color: var(--gold);
+  background: rgba(217, 180, 90, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(217, 180, 90, 0.2);
+}
+
+.sim-preset-card strong {
+  font-size: 14px;
+}
+
+.sim-preset-card span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.sim-preset-card small {
+  align-self: end;
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.sim-form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.sim-form-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sim-form-grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.sim-field {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sim-field > span {
+  color: #dce7e2;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.sim-field input,
+.sim-field select,
+.sim-field textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  color: var(--paper);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  outline: none;
+  background: #0a1512;
+  font: inherit;
+  font-size: 12px;
+}
+
+.sim-field input:focus,
+.sim-field select:focus,
+.sim-field textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(217, 180, 90, 0.12);
+}
+
+.sim-field small {
+  color: #82948c;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.sim-rules-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.sim-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sim-toggle-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.sim-toggle-field input {
+  margin-top: 2px;
+}
+
+.sim-toggle-field span {
+  display: grid;
+  gap: 2px;
+}
+
+.sim-toggle-field strong {
+  font-size: 11px;
+}
+
+.sim-toggle-field small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.sim-derived-strip,
+.sim-summary-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 15px;
+  padding: 11px 13px;
+  border-radius: 7px;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 11px;
+}
+
+.sim-derived-strip strong {
+  color: var(--paper);
+}
+
+.sim-expert-collapsed {
+  padding-bottom: 20px;
+}
+
+.sim-launch-card {
+  display: grid;
+  gap: 13px;
+  padding: 20px;
+  border-color: rgba(217, 180, 90, 0.35);
+}
+
+.sim-launch-card h3 {
+  font-size: 19px;
+}
+
+.sim-launch-card dl {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+
+.sim-launch-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.sim-launch-card dt {
+  color: var(--muted);
+}
+
+.sim-launch-card dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 800;
+}
+
+.sim-validation-summary {
+  display: grid;
+  gap: 5px;
+  padding: 10px 11px;
+  border: 1px solid rgba(103, 213, 138, 0.3);
+  border-radius: 7px;
+  color: #a7edbb;
+  background: rgba(103, 213, 138, 0.08);
+  font-size: 10px;
+}
+
+.sim-validation-summary.is-invalid {
+  border-color: rgba(228, 95, 95, 0.35);
+  color: #ffaaa0;
+  background: rgba(228, 95, 95, 0.08);
+}
+
+.sim-validation-summary strong {
+  font-size: 11px;
+}
+
+.sim-error-message {
+  margin: 0;
+  color: #ffaaa0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.sim-command-preview {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sim-command-preview summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.sim-command-preview code {
+  display: block;
+  margin-top: 8px;
+  padding: 10px;
+  overflow-wrap: anywhere;
+  border-radius: 6px;
+  color: #cbd8d2;
+  background: #07100e;
+  line-height: 1.45;
+}
+
+.simulator-loading {
+  padding: 30px;
+  color: var(--muted);
+}
+
+@media (max-width: 1100px) {
+  .sim-builder-layout {
+    grid-template-columns: 1fr;
+  }
+  .sim-builder-sidebar {
+    position: static;
+  }
+  .sim-preset-grid,
+  .sim-form-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

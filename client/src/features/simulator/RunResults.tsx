@@ -5,6 +5,7 @@ import type {
   StrategySimulationSummary
 } from "@blackjack/shared";
 import { formatCompactNumber } from "./format";
+import { EvaluatorAnalysisPanel, GeneratorEvidencePanel } from "./RunEvidence";
 
 const DEALERS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "A"];
 const SECTIONS = [
@@ -40,11 +41,13 @@ function percent(value: number): string {
 }
 
 export function GeneratorResults({
+  runId,
   summary,
   selectedBucket,
   onBucketChange,
   onImport
 }: {
+  runId: string;
   summary: StrategySimulationSummary;
   selectedBucket: string;
   onBucketChange: (bucket: string) => void;
@@ -224,6 +227,7 @@ export function GeneratorResults({
           )}
         </aside>
       </div>
+      <GeneratorEvidencePanel runId={runId} selectedBucket={selectedBucket} />
     </div>
   );
 }
@@ -237,7 +241,13 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: "
   );
 }
 
-export function EvaluatorResults({ summary }: { summary: StrategyEvaluationSummary }) {
+export function EvaluatorResults({
+  runId,
+  summary
+}: {
+  runId: string;
+  summary: StrategyEvaluationSummary;
+}) {
   const outcomeEntries = Object.entries(summary.outcomeRates);
   const maxOutcome = Math.max(...outcomeEntries.map(([, value]) => value), 0.01);
   return (
@@ -352,6 +362,7 @@ export function EvaluatorResults({ summary }: { summary: StrategyEvaluationSumma
           </div>
         </div>
       </section>
+      <EvaluatorAnalysisPanel runId={runId} />
     </div>
   );
 }

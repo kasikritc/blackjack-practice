@@ -571,8 +571,8 @@ void write_artifacts(const Config& config, const std::vector<CellResult>& cells,
     for (const auto& action : cell.actions) {
       for (const auto& [running_count, stats] : action.running_counts) {
         count_strata.push_back({{"category", cell.category}, {"rowKey", cell.row_key},
-          {"dealerUpcard", cell.dealer}, {"decksRemaining", cell.decks_remaining},
-          {"runningCount", running_count},
+          {"dealerUpcard", cell.dealer}, {"trueCount", cell.true_count},
+          {"decksRemaining", cell.decks_remaining}, {"runningCount", running_count},
           {"exactTrueCount", running_count / cell.decks_remaining},
           {"action", action_name(action.action)}, {"samples", stats.samples},
           {"ev", stats.mean()}, {"standardError", stats.standard_error()}});

@@ -143,6 +143,7 @@ export interface GeneratorCountStratum {
   category: string;
   rowKey: string;
   dealerUpcard: string;
+  trueCount?: number;
   decksRemaining: number;
   runningCount: number;
   exactTrueCount: number;

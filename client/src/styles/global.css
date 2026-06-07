@@ -4156,3 +4156,232 @@ button:disabled {
 .sim-compare-metric-table .is-negative {
   color: #ff9186;
 }
+
+.sim-evidence-explorer {
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(8, 19, 16, 0.45);
+  overflow: hidden;
+}
+
+.sim-evidence-explorer > summary {
+  cursor: pointer;
+  padding: 16px 18px;
+  color: var(--cream);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.sim-evidence-explorer[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.sim-evidence-explorer > p,
+.sim-evidence-explorer > .sim-evidence-loading,
+.sim-evidence-explorer > .sim-error-message {
+  margin: 14px 18px 0;
+  color: var(--muted);
+}
+
+.sim-evidence-tabs,
+.sim-evidence-filters {
+  display: flex;
+  gap: 8px;
+  padding: 14px 18px 0;
+}
+
+.sim-evidence-tabs button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.sim-evidence-tabs button.is-active {
+  border-color: rgba(235, 183, 70, 0.6);
+  background: rgba(235, 183, 70, 0.12);
+  color: var(--gold-light);
+}
+
+.sim-evidence-filters input,
+.sim-evidence-filters select {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 11px;
+  background: rgba(3, 12, 10, 0.75);
+  color: var(--cream);
+}
+
+.sim-evidence-filters input {
+  flex: 1;
+}
+
+.sim-data-table {
+  margin: 14px 18px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 520px;
+  overflow: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-data-table > div {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  min-width: 860px;
+  padding: 8px 11px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sim-data-table > div:last-child {
+  border-bottom: 0;
+}
+
+.sim-data-table > div:nth-child(even):not(.sim-data-head) {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.sim-data-table .sim-data-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #10241d;
+  color: var(--cream);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sim-composition-row {
+  grid-template-columns: 1.3fr 1.6fr 0.55fr 0.8fr 0.65fr 1.2fr;
+}
+
+.sim-count-row,
+.sim-cube-row {
+  grid-template-columns: 1fr 0.65fr 0.8fr 0.8fr 0.85fr 0.85fr 1.25fr;
+}
+
+.sim-insurance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+
+.sim-insurance-grid > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sim-insurance-grid span,
+.sim-insurance-grid small {
+  color: var(--muted);
+}
+
+.sim-insurance-grid small {
+  grid-column: 1 / -1;
+}
+
+.sim-table-cap {
+  margin: -7px 18px 18px !important;
+  font-size: 0.78rem;
+}
+
+.sim-analysis-stack {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+.sim-path-distribution {
+  display: flex;
+  align-items: end;
+  gap: 3px;
+  height: 120px;
+  padding: 12px 8px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.sim-path-distribution > div {
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  min-width: 7px;
+  height: 100%;
+}
+
+.sim-path-distribution i {
+  display: block;
+  width: 5px;
+  min-height: 4px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(to top, var(--green-light), var(--gold));
+}
+
+.sim-path-distribution span {
+  color: transparent;
+  font-size: 0.55rem;
+  user-select: none;
+}
+
+
+.sim-run-title-row,
+.sim-run-rename {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.sim-run-title-row h2 {
+  margin: 0;
+}
+
+.sim-rename-button {
+  border: 0;
+  padding: 3px 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.sim-rename-button:hover {
+  color: var(--gold-light);
+}
+
+.sim-run-rename input {
+  min-width: 280px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(3, 12, 10, 0.75);
+  color: var(--cream);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.sim-progress-eta {
+  display: block;
+  margin-top: 8px;
+  color: var(--gold-light);
+  font-size: 0.78rem;
+}
+
+.sim-legacy-note {
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.75rem;
+}

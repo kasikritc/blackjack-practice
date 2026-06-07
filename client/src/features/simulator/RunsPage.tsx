@@ -30,6 +30,14 @@ function formatDuration(milliseconds?: number): string {
   return `${minutes}m ${Math.round(seconds % 60)}s`;
 }
 
+function estimatedRemaining(run: SimulatorRunListItem): number | undefined {
+  if (!run.startedAt) return undefined;
+  const progress = progressPercent(run);
+  if (progress <= 0 || progress >= 100) return undefined;
+  const elapsed = Date.now() - new Date(run.startedAt).getTime();
+  return elapsed * (100 / progress - 1);
+}
+
 function canRerun(detail: SimulatorRunDetail): boolean {
   return (
     detail.workflow === "evaluator" ||
@@ -85,6 +93,8 @@ export function RunsPage() {
   const [selectedBucket, setSelectedBucket] = useState("");
   const [importPackage, setImportPackage] = useState<StrategyChartImportPackage | null>(null);
   const [message, setMessage] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   useEffect(() => {
     if (!showTrash) setRuns(context.runs);
@@ -99,6 +109,7 @@ export function RunsPage() {
         .then(run => {
           if (cancelled) return;
           setDetail(run);
+          if (!editingName) setNameDraft(run.name);
           if (run.generatorSummary && !selectedBucket)
             setSelectedBucket(Object.keys(run.generatorSummary.charts)[0] || "");
         })
@@ -115,7 +126,7 @@ export function RunsPage() {
       cancelled = true;
       if (timer) window.clearInterval(timer);
     };
-  }, [selectedId, runs, selectedBucket]);
+  }, [selectedId, runs, selectedBucket, editingName]);
 
   const filtered = useMemo(
     () =>
@@ -155,6 +166,12 @@ export function RunsPage() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Run action failed.");
     }
+  };
+
+  const saveName = async () => {
+    if (!detail || !nameDraft.trim()) return;
+    await action(() => simulatorApi.rename(detail.id, nameDraft.trim()));
+    setEditingName(false);
   };
 
   const openImport = async (bucket: string) => {
@@ -249,7 +266,37 @@ export function RunsPage() {
                   <span className={`sim-run-type is-${detail.workflow}`}>{detail.workflow}</span>
                   <span className={`sim-run-status is-${detail.status}`}>{detail.status}</span>
                 </div>
-                <h2>{detail.name}</h2>
+                <div className="sim-run-title-row">
+                  {editingName ? (
+                    <div className="sim-run-rename">
+                      <input
+                        value={nameDraft}
+                        onChange={event => setNameDraft(event.target.value)}
+                        onKeyDown={event => event.key === "Enter" && void saveName()}
+                        autoFocus
+                      />
+                      <button className="primary-button" onClick={() => void saveName()}>
+                        Save
+                      </button>
+                      <button className="ghost-button" onClick={() => setEditingName(false)}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h2>{detail.name}</h2>
+                      <button
+                        className="sim-rename-button"
+                        onClick={() => {
+                          setNameDraft(detail.name);
+                          setEditingName(true);
+                        }}
+                      >
+                        Rename
+                      </button>
+                    </>
+                  )}
+                </div>
                 <p>
                   {detail.id} · {new Date(detail.createdAt).toLocaleString()} ·{" "}
                   {formatDuration(detail.elapsedMs)}
@@ -271,7 +318,7 @@ export function RunsPage() {
                     className="primary-button"
                     onClick={() => void action(() => simulatorApi.resume(detail.id))}
                   >
-                    Resume
+                    {detail.workflow === "evaluator" ? "Resume checkpoints" : "Restart run"}
                   </button>
                 ) : null}
                 {detail.status === "completed" && canRerun(detail) ? (
@@ -334,6 +381,11 @@ export function RunsPage() {
                 <div className="sim-live-progress-track">
                   <i style={{ width: `${progressPercent(detail)}%` }} />
                 </div>
+                {estimatedRemaining(detail) !== undefined ? (
+                  <span className="sim-progress-eta">
+                    Estimated remaining {formatDuration(estimatedRemaining(detail))}
+                  </span>
+                ) : null}
                 {detail.progress?.workflow === "generator" ? (
                   <div className="sim-live-evidence">
                     <span>
@@ -373,11 +425,15 @@ export function RunsPage() {
                 </button>
               ))}
             </nav>
+            {detail.error ? (
+              <p className="sim-error-message sim-detail-message">{detail.error}</p>
+            ) : null}
             {message ? <p className="sim-error-message sim-detail-message">{message}</p> : null}
 
             <div className="sim-detail-content">
               {tab === "results" && detail.generatorSummary ? (
                 <GeneratorResults
+                  runId={detail.id}
                   summary={detail.generatorSummary}
                   selectedBucket={
                     selectedBucket || Object.keys(detail.generatorSummary.charts)[0] || ""
@@ -387,7 +443,7 @@ export function RunsPage() {
                 />
               ) : null}
               {tab === "results" && detail.evaluatorSummary ? (
-                <EvaluatorResults summary={detail.evaluatorSummary} />
+                <EvaluatorResults runId={detail.id} summary={detail.evaluatorSummary} />
               ) : null}
               {tab === "results" && !detail.generatorSummary && !detail.evaluatorSummary ? (
                 <div className="sim-empty-detail">

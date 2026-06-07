@@ -258,12 +258,14 @@ CompleteRoundOutcome play_complete_round(const Rules& rules, const CompletePolic
   if (shoe.total < 15) throw std::runtime_error("insufficient cards for a complete round");
 
   const Shoe before = shoe;
-  const double decks_remaining = static_cast<double>(shoe.total) / 52.0;
-  const double exact_true_count = running_count / decks_remaining;
   HandState player{{draw_card(shoe, rng)}, initial_wager};
   std::vector<Rank> dealer{draw_card(shoe, rng)};
   player.cards.push_back(draw_card(shoe, rng));
   dealer.push_back(draw_card(shoe, rng));
+  const int decision_count = running_count + hi_lo_value(player.cards[0]) +
+    hi_lo_value(player.cards[1]) + hi_lo_value(dealer.front());
+  const double decision_decks = static_cast<double>(shoe.total) / 52.0;
+  const double decision_true_count = decision_count / decision_decks;
 
   CompleteRoundOutcome out;
   out.initial_wager = initial_wager;
@@ -272,8 +274,8 @@ CompleteRoundOutcome play_complete_round(const Rules& rules, const CompletePolic
   out.dealer_blackjack = dealer_natural(dealer);
 
   if (dealer.front() == Rank::Ace && rules.insurance) {
-    const InsuranceContext context{out.player_blackjack, running_count, decks_remaining,
-                                   exact_true_count};
+    const InsuranceContext context{out.player_blackjack, decision_count, decision_decks,
+                                   decision_true_count};
     if (policy.choose_insurance(context) == InsuranceDecision::Take) {
       out.insurance_taken = true;
       out.even_money_taken = out.player_blackjack;
@@ -296,7 +298,7 @@ CompleteRoundOutcome play_complete_round(const Rules& rules, const CompletePolic
     const auto legal = legal_actions(hand, rules, total_hands, initial);
     if (legal.empty()) throw std::logic_error("policy requested for terminal hand");
     const DecisionContext context{hand, dealer.front(), rules, legal, total_hands, initial,
-                                  running_count, decks_remaining, exact_true_count};
+                                  decision_count, decision_decks, decision_true_count};
     const Action action = policy.choose_action(context);
     if (!contains(legal, action))
       throw std::invalid_argument("strategy selected illegal action: " + action_name(action));

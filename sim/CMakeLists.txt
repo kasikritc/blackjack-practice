@@ -19,6 +19,12 @@ add_library(blackjack_core STATIC
 )
 target_include_directories(blackjack_core PUBLIC src)
 
+add_library(strategy_policy STATIC
+  src/strategy_package.cpp
+)
+target_include_directories(strategy_policy PUBLIC src PRIVATE vendor)
+target_link_libraries(strategy_policy PUBLIC blackjack_core)
+
 add_executable(simulate-strategy
   src/main.cpp
   src/config.cpp
@@ -40,10 +46,14 @@ if(BUILD_TESTING)
   target_link_libraries(config-tests PRIVATE blackjack_core)
   target_compile_definitions(config-tests PRIVATE SIM_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   add_test(NAME config-tests COMMAND config-tests)
+  add_executable(strategy-package-tests tests/strategy_package_tests.cpp)
+  target_include_directories(strategy-package-tests PRIVATE src vendor)
+  target_link_libraries(strategy-package-tests PRIVATE strategy_policy)
+  add_test(NAME strategy-package-tests COMMAND strategy-package-tests)
 endif()
 
 if(SIM_ENABLE_SANITIZERS)
-  foreach(target blackjack_core blackjack-tests config-tests simulate-strategy)
+  foreach(target blackjack_core strategy_policy blackjack-tests config-tests strategy-package-tests simulate-strategy)
     target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address,undefined> $<$<COMPILE_LANGUAGE:CXX>:-fno-omit-frame-pointer>)
     target_link_options(${target} PRIVATE -fsanitize=address,undefined)
   endforeach()

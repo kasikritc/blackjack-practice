@@ -13,6 +13,7 @@ export default tseslint.config(
       "basic-strategy-calculator/**",
       "sim/build/**",
       "sim/runs/**",
+      "sim/build-prof/**",
       "*.cjs"
     ]
   },

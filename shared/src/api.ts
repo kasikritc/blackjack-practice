@@ -110,6 +110,23 @@ export interface FlashRoundSubmittedRequest {
   cards?: CardPayload[];
 }
 
+export interface DeckCountdownRoundSubmittedRequest {
+  sessionId: number;
+  deckCount?: number;
+  totalCards?: number;
+  omittedCardCount?: number;
+  cardsPerFlip?: number;
+  flipMode?: string;
+  autoIntervalMs?: number;
+  stopwatchShown?: boolean;
+  correctCount?: number;
+  userAnswer?: number;
+  signedError?: number;
+  absoluteError?: number;
+  correct?: boolean;
+  responseTimeMs?: number;
+}
+
 export interface StrategyAttemptRequest {
   ruleProfileId?: number;
   chartId?: number;
@@ -200,6 +217,7 @@ export interface TrendDay {
   accuracy: number;
   avgError: number;
   medianResponse: number;
+  cleanTimePerDeckMs?: number;
 }
 
 export interface AnalyticsTrends {
@@ -236,4 +254,26 @@ export interface FlashSummary {
   noMajorErrorStreak: number;
   errorBuckets: ErrorBuckets;
   byCardCount: MetricGroup[];
+}
+
+export interface DeckCountdownSummary {
+  masteryScore: number;
+  level: string;
+  totals: { rounds: number; cards: number; sessions: number; correct: number };
+  accuracy: number;
+  recentAccuracy: number;
+  avgError: number;
+  recentAvgError: number;
+  avgCards: number;
+  avgDecks: number;
+  medianResponse: number;
+  p90Response: number;
+  bestTimeMs: number;
+  currentStreak: number;
+  bestStreak: number;
+  noMajorErrorStreak: number;
+  errorBuckets: ErrorBuckets;
+  byDeckCount: MetricGroup[];
+  byCardsPerFlip: MetricGroup[];
+  byFlipMode: MetricGroup[];
 }

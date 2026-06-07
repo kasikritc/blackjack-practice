@@ -179,3 +179,24 @@ eventsRouter.post("/events/flash-round-submitted", (req, res) => {
   }
   res.status(201).json({ id: row.id });
 });
+
+eventsRouter.post("/events/deck-countdown-round-submitted", (req, res) => {
+  const body = req.body || {};
+  const row = insert("deck_countdown_rounds", {
+    session_id: body.sessionId,
+    deck_count: body.deckCount,
+    total_cards: body.totalCards,
+    omitted_card_count: body.omittedCardCount,
+    cards_per_flip: body.cardsPerFlip,
+    flip_mode: body.flipMode,
+    auto_interval_ms: body.autoIntervalMs,
+    stopwatch_shown: body.stopwatchShown ? 1 : 0,
+    correct_count: body.correctCount,
+    user_answer: body.userAnswer,
+    signed_error: body.signedError,
+    absolute_error: body.absoluteError,
+    correct: body.correct ? 1 : 0,
+    response_time_ms: body.responseTimeMs
+  });
+  res.status(201).json({ id: row.id });
+});

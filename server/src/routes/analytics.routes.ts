@@ -6,6 +6,11 @@ import {
   buildFlashTrends,
   flashRecentSessions
 } from "../services/flashAnalytics.service.js";
+import {
+  buildDeckCountdownSummary,
+  buildDeckCountdownTrends,
+  deckCountdownRecentSessions
+} from "../services/deckCountdownAnalytics.service.js";
 import { clampInt, rangeToSinceIso } from "../util.js";
 
 export const analyticsRouter = Router();
@@ -49,5 +54,28 @@ analyticsRouter.get("/analytics/flash-sessions", (req, res) => {
 
 analyticsRouter.delete("/analytics/flash", (_req, res) => {
   runSql("DELETE FROM flash_round_cards; DELETE FROM flash_rounds;");
+  res.status(200).json({ ok: true });
+});
+
+analyticsRouter.get("/analytics/deck-countdown-summary", (_req, res) => {
+  res.status(200).json(buildDeckCountdownSummary());
+});
+
+analyticsRouter.get("/analytics/deck-countdown-trends", (req, res) => {
+  res.status(200).json(buildDeckCountdownTrends((req.query.range as string) || "all"));
+});
+
+analyticsRouter.get("/analytics/deck-countdown-sessions", (req, res) => {
+  const limit = clampInt(req.query.limit, 10, 1, 500);
+  const range = (req.query.range as string) || "all";
+  res.status(200).json({
+    sessions: deckCountdownRecentSessions(limit, rangeToSinceIso(range)),
+    limit,
+    range
+  });
+});
+
+analyticsRouter.delete("/analytics/deck-countdown", (_req, res) => {
+  runSql("DELETE FROM deck_countdown_rounds;");
   res.status(200).json({ ok: true });
 });

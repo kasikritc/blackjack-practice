@@ -7,15 +7,19 @@ import {
   STRATEGY_ACTION_LABELS,
   STRATEGY_ACTIONS_ORDER,
   STRATEGY_DEALERS,
+  STRATEGY_FALLBACK_ACTIONS_ORDER,
   cloneCriteria,
   defaultStrategyCriteria,
   getStrategyCellAction,
+  getStrategyViewCellAction,
   isStrategyCellIncluded,
   isStrategyRowIncluded,
   parseStrategyCellId,
   strategyCellId,
   strategyChartSections,
+  strategyFallbackActionRequired,
   toggleArrayValue,
+  type StrategyChartView,
   type StrategyCriteria
 } from "./strategyLogic";
 
@@ -32,7 +36,13 @@ interface Props {
   onCriteriaChange: (criteria: StrategyCriteria) => void;
   onSelectChart: (id: number) => void;
   onSelectSubset: (id: number) => void;
-  onChartCellChange: (category: string, rowKey: string, dealer: string, action: string) => void;
+  onChartCellChange: (
+    category: string,
+    rowKey: string,
+    dealer: string,
+    action: string,
+    target: StrategyChartView
+  ) => void;
   onDataChange: (data: StrategyData, sel?: { chartId?: number; subsetId?: number }) => void;
   onFeedback: (msg: string) => void;
 }
@@ -62,12 +72,14 @@ export function StrategyChartPanel({
   const [subsetName, setSubsetName] = useState("");
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [cellAction, setCellAction] = useState("");
+  const [chartView, setChartView] = useState<StrategyChartView>("opening");
 
   useEffect(() => {
     setChartName(currentChart?.name ?? "");
     setEditingCell(null);
+    setCellAction("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartId]);
+  }, [chartId, chartView]);
 
   // --- criteria (live drill subset) mutations ---
   const updateCriteria = (next: StrategyCriteria) => onCriteriaChange(next);
@@ -96,18 +108,27 @@ export function StrategyChartPanel({
       cells: toggleArrayValue(criteria.cells, strategyCellId(category, rowKey, dealer))
     });
 
+  const fallbackEditable = (category: string, rowKey: string, dealer: string) =>
+    strategyFallbackActionRequired(
+      category,
+      getStrategyCellAction(currentChart?.chart, category, rowKey, dealer)
+    );
+
   const onCellClick = (category: string, rowKey: string, dealer: string) => {
+    if (chartView === "fallback" && !fallbackEditable(category, rowKey, dealer)) return;
     const id = strategyCellId(category, rowKey, dealer);
     setEditingCell(id);
-    setCellAction(getStrategyCellAction(currentChart?.chart, category, rowKey, dealer) || "");
-    toggleCell(category, rowKey, dealer);
+    setCellAction(
+      getStrategyViewCellAction(currentChart?.chart, chartView, category, rowKey, dealer) || ""
+    );
+    if (chartView === "opening") toggleCell(category, rowKey, dealer);
   };
 
   const onCellActionChange = (action: string) => {
     setCellAction(action);
-    if (!editingCell) return;
+    if (!editingCell || !action) return;
     const cell = parseStrategyCellId(editingCell);
-    onChartCellChange(cell.category, cell.rowKey, cell.dealer, action);
+    onChartCellChange(cell.category, cell.rowKey, cell.dealer, action, chartView);
   };
 
   // --- persistence ---
@@ -197,19 +218,35 @@ export function StrategyChartPanel({
     rowKey: string;
     dealer: string;
   }) {
-    const action = getStrategyCellAction(currentChart?.chart, category, rowKey, dealer);
+    const action = getStrategyViewCellAction(
+      currentChart?.chart,
+      chartView,
+      category,
+      rowKey,
+      dealer
+    );
+    const primaryAction = getStrategyCellAction(currentChart?.chart, category, rowKey, dealer);
+    const editableFallback = fallbackEditable(category, rowKey, dealer);
     const included = isStrategyCellIncluded(criteria, category, rowKey, dealer);
-    const label = (action && STRATEGY_ACTION_ABBREVIATIONS[action]) || action || "-";
-    const cls = `strategy-cell${action ? ` action-${action}` : ""}${included ? " is-included" : " is-excluded"}`;
-    const title = `${(action && STRATEGY_ACTION_LABELS[action]) || action || "Unset"} - ${
-      included ? "Included in drill" : "Excluded from drill"
-    }`;
+    const label =
+      (action && STRATEGY_ACTION_ABBREVIATIONS[action]) ||
+      (chartView === "fallback" && editableFallback ? "·" : "-");
+    const cls = `strategy-cell${action ? ` action-${action}` : ""}${included ? " is-included" : " is-excluded"}${chartView === "fallback" && editableFallback ? " is-fallback-needed" : ""}${chartView === "fallback" && !editableFallback ? " is-fallback-disabled" : ""}`;
+    const title =
+      chartView === "fallback"
+        ? editableFallback
+          ? `${(action && STRATEGY_ACTION_LABELS[action]) || "Unset"} fallback for ${STRATEGY_ACTION_LABELS[primaryAction || ""] || primaryAction}`
+          : "No after-hit fallback needed for this cell"
+        : `${(action && STRATEGY_ACTION_LABELS[action]) || action || "Unset"} - ${
+            included ? "Included in drill" : "Excluded from drill"
+          }`;
     return (
       <td>
         <button
           type="button"
           className={cls}
           title={title}
+          disabled={chartView === "fallback" && !editableFallback}
           onClick={() => onCellClick(category, rowKey, dealer)}
         >
           {label}
@@ -326,6 +363,22 @@ export function StrategyChartPanel({
             )}
           </select>
         </label>
+        <div className="strategy-view-toggle" role="group" aria-label="Strategy chart view">
+          <button
+            type="button"
+            className={chartView === "opening" ? "is-active" : ""}
+            onClick={() => setChartView("opening")}
+          >
+            Opening hand
+          </button>
+          <button
+            type="button"
+            className={chartView === "fallback" ? "is-active" : ""}
+            onClick={() => setChartView("fallback")}
+          >
+            After hit fallback
+          </button>
+        </div>
         <button type="button" className="ghost-button" onClick={() => setMode("edit")}>
           Edit chart
         </button>
@@ -338,8 +391,16 @@ export function StrategyChartPanel({
         </label>
         <label>
           Cell action
-          <select value={cellAction} onChange={e => onCellActionChange(e.target.value)}>
-            {STRATEGY_ACTIONS_ORDER.map(action => (
+          <select
+            value={cellAction}
+            disabled={!editingCell}
+            onChange={e => onCellActionChange(e.target.value)}
+          >
+            <option value="">Select a cell</option>
+            {(chartView === "fallback"
+              ? STRATEGY_FALLBACK_ACTIONS_ORDER
+              : STRATEGY_ACTIONS_ORDER
+            ).map(action => (
               <option key={action} value={action}>
                 {STRATEGY_ACTION_LABELS[action]}
               </option>
@@ -399,10 +460,11 @@ export function StrategyChartPanel({
                 </div>
               </section>
               <section>
-                <h3>Practice Include</h3>
+                <h3>{chartView === "fallback" ? "Fallbacks" : "Practice Include"}</h3>
                 <p>
-                  Crossed-out cells are excluded from the drill. Click rows, columns, sections, or
-                  cells to adjust the current subset.
+                  {chartView === "fallback"
+                    ? "Dot cells need an after-hit answer. Select one, choose Hit or Stand, then save the chart."
+                    : "Crossed-out cells are excluded from the drill. Click rows, columns, sections, or cells to adjust the current subset."}
                 </p>
               </section>
             </div>

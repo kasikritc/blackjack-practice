@@ -1,4 +1,4 @@
-import { insert, queryAll, sqlValue } from "../db/client.js";
+import { insert, queryAll, sqlValue, update } from "../db/client.js";
 import { parseSettingsJson } from "../util.js";
 
 export interface StrategyRulesShape {
@@ -79,6 +79,52 @@ export function defaultStrategySubsets() {
 function dealerNumber(dealer: string): number {
   if (dealer === "A") return 11;
   return Number(dealer);
+}
+
+type StrategyCategoryKey = "hard" | "soft" | "pair";
+
+const STRATEGY_CATEGORIES: StrategyCategoryKey[] = ["hard", "soft", "pair"];
+
+function fallbackActionRequired(category: StrategyCategoryKey, action: unknown): boolean {
+  if (category === "pair") return action === "double";
+  return action === "double" || action === "surrender";
+}
+
+function defaultFallbackAction(
+  category: StrategyCategoryKey,
+  rowKey: string,
+  action: unknown
+): string | null {
+  if (!fallbackActionRequired(category, action)) return null;
+  if (action === "surrender") return "hit";
+  if (category === "soft" && Number(rowKey.slice(1)) >= 18) return "stand";
+  return "hit";
+}
+
+export function backfillStrategyFallbacks(chart: any): any {
+  const normalized = {
+    ...(chart || {}),
+    hard: chart?.hard || {},
+    soft: chart?.soft || {},
+    pair: chart?.pair || {},
+    fallbacks: { ...(chart?.fallbacks || {}) }
+  };
+
+  for (const category of STRATEGY_CATEGORIES) {
+    const rows = normalized[category] || {};
+    const fallbackRows = { ...(normalized.fallbacks[category] || {}) };
+    for (const [rowKey, dealerActions] of Object.entries(rows)) {
+      const fallbackDealers = { ...(fallbackRows[rowKey] || {}) };
+      for (const [dealer, action] of Object.entries(dealerActions as Record<string, unknown>)) {
+        const fallback = defaultFallbackAction(category, rowKey, action);
+        if (fallback && !fallbackDealers[dealer]) fallbackDealers[dealer] = fallback;
+      }
+      if (Object.keys(fallbackDealers).length) fallbackRows[rowKey] = fallbackDealers;
+    }
+    if (Object.keys(fallbackRows).length) normalized.fallbacks[category] = fallbackRows;
+  }
+
+  return normalized;
 }
 
 function defaultHardAction(total: number, dealer: string): string {
@@ -163,7 +209,7 @@ export function defaultStrategyChart(rules: StrategyRulesShape = defaultStrategy
       dealers.map(dealer => [dealer, defaultPairAction(rank, dealer)])
     );
   }
-  return applyCommonStrategyAdjustments({ hard, soft, pair }, rules);
+  return backfillStrategyFallbacks(applyCommonStrategyAdjustments({ hard, soft, pair }, rules));
 }
 
 function commonStrategyPresets() {
@@ -276,6 +322,14 @@ export function seedStrategyData(): void {
   if (fallbackChartId) seedDefaultStrategySubsets(fallbackChartId);
 }
 
+function backfillPersistedStrategyChart(id: number, chart: any): any {
+  const normalized = backfillStrategyFallbacks(chart);
+  if (JSON.stringify(normalized) !== JSON.stringify(chart)) {
+    update("strategy_charts", id, { chart_json: JSON.stringify(normalized) });
+  }
+  return normalized;
+}
+
 export function strategyData() {
   return {
     profiles: queryAll("SELECT * FROM strategy_rule_profiles ORDER BY id ASC").map(row => ({
@@ -291,7 +345,7 @@ export function strategyData() {
       name: row.name,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      chart: parseSettingsJson(row.chart_json)
+      chart: backfillPersistedStrategyChart(row.id, parseSettingsJson(row.chart_json))
     })),
     subsets: queryAll("SELECT * FROM strategy_subsets ORDER BY is_default DESC, id ASC").map(
       row => ({

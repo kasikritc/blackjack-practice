@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 **/dist/
+*.tsbuildinfo
 
 # Local analytics database (preserved at runtime, never committed)
 data/

@@ -50,6 +50,10 @@ export const STRATEGY_ACTIONS_ORDER = [
   "insurance"
 ] as const;
 
+export const STRATEGY_FALLBACK_ACTIONS_ORDER = ["hit", "stand"] as const;
+
+export type StrategyChartView = "opening" | "fallback";
+
 /** Mutable subset criteria, including the row dimension used by the studio. */
 export type StrategyCriteria = StrategySubsetCriteria & { rows: string[] };
 
@@ -243,9 +247,43 @@ export function getStrategyCellAction(
   return (chart as any)?.[category]?.[rowKey]?.[dealer] || null;
 }
 
+export function strategyFallbackActionRequired(
+  category: string,
+  action: string | null | undefined
+): boolean {
+  if (category === "pair") return action === "double";
+  return action === "double" || action === "surrender";
+}
+
+export function getStrategyFallbackAction(
+  chart: StrategyChart | undefined,
+  category: string,
+  rowKey: string,
+  dealer: string
+): string | null {
+  return (chart as any)?.fallbacks?.[category]?.[rowKey]?.[dealer] || null;
+}
+
+export function getStrategyViewCellAction(
+  chart: StrategyChart | undefined,
+  view: StrategyChartView,
+  category: string,
+  rowKey: string,
+  dealer: string
+): string | null {
+  if (view === "fallback") return getStrategyFallbackAction(chart, category, rowKey, dealer);
+  return getStrategyCellAction(chart, category, rowKey, dealer);
+}
+
 export interface StrategyDecision extends StrategyClassification {
   dealer: string;
-  expectedAction: string;
+  expectedAction: string | null;
+  expectedActionSource:
+    | "chart"
+    | "fallback"
+    | "missing-chart"
+    | "missing-fallback"
+    | "illegal-action";
 }
 
 export function currentStrategyDecision(
@@ -258,9 +296,39 @@ export function currentStrategyDecision(
   if (!chart || !dealer || !playerHand.length) return null;
   const classified = classifyStrategyHand(playerHand, rules);
   if (classified.total > 21) return null;
-  const expectedAction =
-    getStrategyCellAction(chart, classified.category, classified.rowKey, dealer) || "stand";
-  return { ...classified, dealer, expectedAction };
+
+  const chartAction = getStrategyCellAction(chart, classified.category, classified.rowKey, dealer);
+  if (!chartAction)
+    return { ...classified, dealer, expectedAction: null, expectedActionSource: "missing-chart" };
+
+  if (isStrategyActionLegal(chartAction, rules, playerHand, dealer, false)) {
+    return { ...classified, dealer, expectedAction: chartAction, expectedActionSource: "chart" };
+  }
+
+  if (playerHand.length > 2 && strategyFallbackActionRequired(classified.category, chartAction)) {
+    const fallbackAction = getStrategyFallbackAction(
+      chart,
+      classified.category,
+      classified.rowKey,
+      dealer
+    );
+    if (fallbackAction && isStrategyActionLegal(fallbackAction, rules, playerHand, dealer, false)) {
+      return {
+        ...classified,
+        dealer,
+        expectedAction: fallbackAction,
+        expectedActionSource: "fallback"
+      };
+    }
+    return {
+      ...classified,
+      dealer,
+      expectedAction: null,
+      expectedActionSource: "missing-fallback"
+    };
+  }
+
+  return { ...classified, dealer, expectedAction: null, expectedActionSource: "illegal-action" };
 }
 
 export function strategyHardRows(): Array<{ key: string; label: string }> {

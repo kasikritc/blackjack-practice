@@ -27,7 +27,7 @@
 namespace blackjack_sim {
 namespace {
 using json = nlohmann::json;
-constexpr const char* kEvaluatorVersion = "0.1.0";
+constexpr const char* kEvaluatorVersion = "0.2.0";
 
 struct RetentionConfig {
   std::string mode = "aggregate";
@@ -374,6 +374,12 @@ json summary_json(const json& aggregate) {
           {"artifactVersion", aggregate.at("artifactVersion")}};
 }
 
+std::string resolve_strategy_path(const std::string& value) {
+  if (value.rfind("builtin:", 0) == 0)
+    return std::string(EVALUATOR_SOURCE_DIR) + "/strategies/" + value.substr(8) + ".json";
+  return value;
+}
+
 json read_json_file(const std::string& path) {
   std::ifstream input(path); if (!input) throw std::runtime_error("unable to read JSON: " + path);
   json value; input >> value; return value;
@@ -383,7 +389,7 @@ json read_json_file(const std::string& path) {
 
 int validate_evaluation_strategy(const std::string& strategy_path) {
   try {
-    const auto package = parse_strategy_package(strategy_path);
+    const auto package = parse_strategy_package(resolve_strategy_path(strategy_path));
     std::cout << package.id << ": valid\n";
     return 0;
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
@@ -393,7 +399,8 @@ int run_evaluation(const EvaluationOptions& options) {
   try {
     const auto started = std::chrono::steady_clock::now();
     const EvaluationConfig config = parse_evaluation_config(options.config_path);
-    const StrategyPackage strategy = parse_strategy_package(config.strategy_path);
+    const std::string strategy_path = resolve_strategy_path(config.strategy_path);
+    const StrategyPackage strategy = parse_strategy_package(strategy_path);
     const ChartPolicy policy(strategy);
     if (config.mode == "fresh-round" && policy.wager_units(0, strategy.rules.decks * 52) <= 0)
       throw std::invalid_argument("fresh-round strategy must wager above zero at off-the-top count");
@@ -402,14 +409,20 @@ int run_evaluation(const EvaluationOptions& options) {
       if (has_zero) throw std::invalid_argument("continuous zero-bet ramps require observerSeats above zero");
     }
 
-    const json strategy_json = read_json_file(config.strategy_path);
+    const json strategy_json = read_json_file(strategy_path);
     const json config_json = read_json_file(options.config_path);
-    const std::string run_id = options.resume_dir.empty()
-      ? slug(config.name) + "-" + now_compact()
-      : std::filesystem::path(options.resume_dir).filename().string();
-    const std::filesystem::path run_dir = options.resume_dir.empty()
-      ? std::filesystem::path(options.output_dir) / run_id
-      : std::filesystem::path(options.resume_dir);
+    std::string run_id;
+    std::filesystem::path run_dir;
+    if (options.resume_dir.empty()) {
+      const std::string base_id = slug(config.name) + "-" + now_compact();
+      run_dir = std::filesystem::path(options.output_dir) / base_id;
+      for (int suffix = 2; std::filesystem::exists(run_dir); ++suffix)
+        run_dir = std::filesystem::path(options.output_dir) / (base_id + "-" + std::to_string(suffix));
+      run_id = run_dir.filename().string();
+    } else {
+      run_dir = std::filesystem::path(options.resume_dir);
+      run_id = run_dir.filename().string();
+    }
     if (options.resume_dir.empty()) {
       std::filesystem::create_directories(run_dir);
       json initial_manifest = {{"id", run_id}, {"createdAt", now_compact()}, {"status", "running"},
@@ -452,6 +465,7 @@ int run_evaluation(const EvaluationOptions& options) {
           if (dealt >= cut || shoe.total < 30) { shoe = full_shoe(strategy.rules.decks); running_count = 0; ++shoe_number; }
         }
         const int cards_before = shoe.total;
+        const int running_count_before = running_count;
         const int tc = strategy_true_count(running_count / (cards_before / 52.0), strategy.true_count_rounding);
         const int depth = static_cast<int>(std::floor(100.0 * (strategy.rules.decks * 52 - cards_before) /
                                                      (strategy.rules.decks * 52)));
@@ -461,8 +475,12 @@ int run_evaluation(const EvaluationOptions& options) {
           running_count += observed.running_count_delta;
           result.stats.add_observed_round(); result.cubes[cube_key(tc, depth, 0.0)].add_observed_round();
           if (config.retention.mode == "full" || (config.retention.mode == "sampled" && round % config.retention.sample_every == 0))
-            raw->write(json({{"path", path_index}, {"round", round}, {"shoe", shoe_number}, {"trueCount", tc},
-                         {"depthPercent", depth}, {"wager", 0.0}, {"profit", 0.0}, {"observed", true}}).dump() + "\n");
+            raw->write(json({{"recordVersion", 1}, {"path", path_index}, {"round", round},
+                         {"shoe", shoe_number}, {"trueCount", tc}, {"depthPercent", depth},
+                         {"runningCountBefore", running_count_before}, {"runningCountAfter", running_count},
+                         {"cardsRemainingBefore", cards_before}, {"cardsRemainingAfter", shoe.total},
+                         {"cardsConsumed", observed.cards_consumed}, {"wager", 0.0}, {"profit", 0.0},
+                         {"observed", true}}).dump() + "\n");
           continue;
         }
         const auto outcome = play_complete_round(strategy.rules, policy, shoe, rng, running_count, wager);
@@ -473,11 +491,21 @@ int run_evaluation(const EvaluationOptions& options) {
         for (size_t i = 0; i < config.risk_bankroll_units.size(); ++i)
           if (cumulative <= -config.risk_bankroll_units[i]) result.ruined[i] = true;
         if (config.retention.mode == "full" || (config.retention.mode == "sampled" && round % config.retention.sample_every == 0))
-          raw->write(json({{"path", path_index}, {"round", round}, {"shoe", shoe_number}, {"trueCount", tc},
-                       {"depthPercent", depth}, {"wager", wager}, {"profit", outcome.profit},
-                       {"exposure", outcome.total_exposure}, {"hands", outcome.hands},
-                       {"playerBlackjack", outcome.player_blackjack}, {"dealerBlackjack", outcome.dealer_blackjack},
-                       {"insuranceTaken", outcome.insurance_taken}, {"evenMoneyTaken", outcome.even_money_taken}}).dump() + "\n");
+          raw->write(json({{"recordVersion", 1}, {"path", path_index}, {"round", round},
+                       {"shoe", shoe_number}, {"trueCount", tc}, {"depthPercent", depth},
+                       {"runningCountBefore", running_count_before}, {"runningCountAfter", running_count},
+                       {"cardsRemainingBefore", cards_before}, {"cardsRemainingAfter", shoe.total},
+                       {"cardsConsumed", outcome.cards_consumed}, {"wager", wager},
+                       {"initialWager", outcome.initial_wager}, {"exposure", outcome.total_exposure},
+                       {"profit", outcome.profit}, {"hands", outcome.hands},
+                       {"wins", outcome.wins}, {"losses", outcome.losses}, {"pushes", outcome.pushes},
+                       {"busts", outcome.busts}, {"doubles", outcome.doubles},
+                       {"surrenders", outcome.surrenders}, {"splits", outcome.hands - 1},
+                       {"playerBlackjack", outcome.player_blackjack},
+                       {"dealerBlackjack", outcome.dealer_blackjack},
+                       {"insuranceTaken", outcome.insurance_taken},
+                       {"insuranceProfit", outcome.insurance_profit},
+                       {"evenMoneyTaken", outcome.even_money_taken}, {"observed", false}}).dump() + "\n");
       }
       if (raw) raw->close();
       write_zstd(checkpoint_path, path_result_json(result).dump());

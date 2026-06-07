@@ -271,11 +271,18 @@ export class SimulatorStore {
   }
 
   markInterruptedForRestart(): void {
-    this.db
+    const rows = this.db
       .prepare(
-        "UPDATE simulator_runs SET status = 'queued', queue_position = ? WHERE status IN ('running', 'cancelling')"
+        "SELECT id FROM simulator_runs WHERE status IN ('running', 'cancelling') ORDER BY started_at, created_at"
       )
-      .run(this.nextQueuePosition());
+      .all() as Array<{ id: string }>;
+    let queuePosition = this.nextQueuePosition();
+    const requeue = this.db.prepare(
+      "UPDATE simulator_runs SET status = 'queued', queue_position = ?, error = NULL WHERE id = ?"
+    );
+    this.db.transaction(() => {
+      for (const row of rows) requeue.run(queuePosition++, row.id);
+    })();
   }
 
   remove(id: string): void {

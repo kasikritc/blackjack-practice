@@ -3,9 +3,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
+import { zstdDecompressSync } from "node:zlib";
 import { randomUUID } from "node:crypto";
 import type {
+  EvaluatorAggregateAnalysis,
   EvaluatorProgress,
+  GeneratorCompositionEvidence,
+  GeneratorCountStratum,
+  GeneratorEvidenceResponse,
+  GeneratorInsuranceResult,
   GeneratorProgress,
   SimulatorArtifact,
   SimulatorEvent,
@@ -86,6 +92,14 @@ function normalizeGeneratorSummary(
   };
 }
 
+function readZstdJson<T>(file: string): T | undefined {
+  try {
+    return JSON.parse(zstdDecompressSync(fs.readFileSync(file)).toString("utf8")) as T;
+  } catch {
+    return undefined;
+  }
+}
+
 function compactDate(value: unknown): string {
   if (typeof value !== "string") return new Date().toISOString();
   if (/^\d{8}T\d{6}Z$/.test(value)) {
@@ -162,18 +176,35 @@ function validateGenerator(config: StrategySimulationConfig): SimulatorValidatio
   const issues: SimulatorValidationIssue[] = [];
   const error = (field: string, message: string) =>
     issues.push({ path: field, severity: "error", message });
-  if (!config.name.trim()) error("name", "Name is required.");
-  if (!config.seed.trim()) error("seed", "Seed is required.");
+  if (!config.name?.trim()) error("name", "Name is required.");
+  if (!config.seed?.trim()) error("seed", "Seed is required.");
   if (config.minSamplesPerAction <= 0 || config.maxSamplesPerAction < config.minSamplesPerAction)
     error("samples", "Sample limits must be positive and maximum must be at least minimum.");
   if (config.batchSize <= 0 || config.maxSamplesPerAction % config.batchSize !== 0)
     error("batchSize", "Batch size must be positive and divide the maximum sample count.");
+  if (config.shoeSamplesPerBucket <= 0)
+    error("shoeSamplesPerBucket", "Reachable shoe samples must be positive.");
+  if (config.maxPolicyIterations <= 0)
+    error("maxPolicyIterations", "Policy iterations must be positive.");
+  if (config.minimumEvMargin < 0 || config.confidenceZ <= 0)
+    error("convergence", "EV margin must be non-negative and confidence Z must be positive.");
   if (!config.trueCountBuckets.length)
     error("trueCountBuckets", "At least one true-count bucket is required.");
   if (!config.decksRemainingBuckets.length)
     error("decksRemainingBuckets", "At least one decks-remaining bucket is required.");
+  if (!config.decksRemainingBuckets.every(value => value > 0 && value <= config.rules.decks))
+    error(
+      "decksRemainingBuckets",
+      "Decks remaining must be positive and no greater than the shoe size."
+    );
   if (!config.rules.dealerPeek || !config.rules.dealerHoleCard)
     error("rules", "Only American hole-card games with dealer peek are supported.");
+  if (config.rules.decks < 1 || config.rules.decks > 8)
+    error("rules.decks", "Deck count must be between 1 and 8.");
+  if (config.rules.maxSplitHands < 1 || config.rules.maxSplitHands > 8)
+    error("rules.maxSplitHands", "Maximum split hands must be between 1 and 8.");
+  if (config.rules.hitSplitAces && config.rules.oneCardSplitAces)
+    error("rules.hitSplitAces", "Hit split aces and one-card split aces cannot both be enabled.");
   if (Object.keys(config.rules.customRules || {}).length)
     error("rules.customRules", "Custom rules are not supported by the native simulator.");
   return issues;
@@ -183,14 +214,25 @@ function validateEvaluator(config: StrategyEvaluationRunConfig): SimulatorValida
   const issues: SimulatorValidationIssue[] = [];
   const error = (field: string, message: string) =>
     issues.push({ path: field, severity: "error", message });
-  if (!config.name.trim()) error("name", "Name is required.");
-  if (!config.seed.trim()) error("seed", "Seed is required.");
+  if (!config.name?.trim()) error("name", "Name is required.");
+  if (!config.seed?.trim()) error("seed", "Seed is required.");
+  if (!["fresh-round", "continuous-shoe"].includes(config.mode))
+    error("mode", "Mode must be fresh-round or continuous-shoe.");
   if (config.rounds < 1 || config.paths < 1 || config.paths > config.rounds)
     error("rounds", "Rounds and paths must be positive, with paths no greater than rounds.");
   if (config.penetrationPercent <= 0 || config.penetrationPercent >= 100)
     error("penetrationPercent", "Penetration must be between 0 and 100 percent.");
   if (config.observerSeats < 0 || config.observerSeats > 7)
     error("observerSeats", "Observer seats must be between 0 and 7.");
+  if (config.roundsPerHour <= 0 || config.confidenceZ <= 0)
+    error("statistics", "Rounds per hour and confidence Z must be positive.");
+  if (
+    !config.riskBankrollUnits.length ||
+    config.riskBankrollUnits.some(value => !Number.isFinite(value) || value <= 0)
+  )
+    error("riskBankrollUnits", "Risk bankroll thresholds must contain positive finite values.");
+  if (config.retention.sampleEvery <= 0)
+    error("retention.sampleEvery", "Raw-round sample interval must be positive.");
   if (
     config.retention.mode === "full" &&
     config.rounds > 10_000_000 &&
@@ -201,6 +243,57 @@ function validateEvaluator(config: StrategyEvaluationRunConfig): SimulatorValida
       "Full retention above ten million rounds requires acknowledgement."
     );
   return issues;
+}
+
+function validateNativeStrategy(request: SimulatorRunRequest): SimulatorValidationIssue[] {
+  if (request.workflow !== "evaluator" || !request.strategyPackage) return [];
+  if (!fs.existsSync(EVALUATOR_BINARY))
+    return [
+      {
+        path: "strategyPackage",
+        severity: "error",
+        message: "Native evaluator binary is not built."
+      }
+    ];
+  const directory = fs.mkdtempSync(path.join(SIM_JOB_DIR, "validate-"));
+  const file = path.join(directory, "strategy.json");
+  try {
+    fs.writeFileSync(file, JSON.stringify(request.strategyPackage));
+    execFileSync(EVALUATOR_BINARY, ["validate", "--strategy", file], {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    const ramp = request.strategyPackage.bettingRamp;
+    const offTop =
+      [...ramp]
+        .filter(step => step.atOrAbove <= 0)
+        .sort((left, right) => right.atOrAbove - left.atOrAbove)[0]?.units ?? 0;
+    const issues: SimulatorValidationIssue[] = [];
+    if (request.config.mode === "fresh-round" && offTop <= 0)
+      issues.push({
+        path: "strategyPackage.bettingRamp",
+        severity: "error",
+        message: "Fresh-round evaluation must wager above zero at the off-the-top count."
+      });
+    if (
+      request.config.mode === "continuous-shoe" &&
+      request.config.observerSeats === 0 &&
+      ramp.some(step => step.units === 0)
+    )
+      issues.push({
+        path: "observerSeats",
+        severity: "error",
+        message: "Continuous zero-bet ramps require at least one observer seat."
+      });
+    return issues;
+  } catch (error) {
+    const detail = error as { stderr?: Buffer | string; message?: string };
+    const message = String(detail.stderr || detail.message || "Invalid strategy package").trim();
+    return [{ path: "strategyPackage", severity: "error", message }];
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 export class SimulatorRunner {
@@ -263,11 +356,53 @@ export class SimulatorRunner {
     return run;
   }
 
+  generatorEvidence(id: string): GeneratorEvidenceResponse {
+    const run = this.store.detail(id);
+    if (!run?.outputDirectory || run.workflow !== "generator")
+      throw new Error("Generator run artifacts are not available.");
+    return {
+      composition:
+        readJson<GeneratorCompositionEvidence[]>(
+          path.join(run.outputDirectory, "composition-evidence.json")
+        ) || [],
+      countStrata:
+        readJson<GeneratorCountStratum[]>(
+          path.join(run.outputDirectory, "count-strata-results.json")
+        ) || [],
+      insurance:
+        readJson<GeneratorInsuranceResult[]>(
+          path.join(run.outputDirectory, "insurance-results.json")
+        ) || []
+    };
+  }
+
+  evaluatorAnalysis(id: string): EvaluatorAggregateAnalysis {
+    const run = this.store.detail(id);
+    if (!run?.outputDirectory || run.workflow !== "evaluator")
+      throw new Error("Evaluator aggregate analysis is not available.");
+    const analysis = readZstdJson<EvaluatorAggregateAnalysis>(
+      path.join(run.outputDirectory, "aggregate-data.json.zst")
+    );
+    if (!analysis) throw new Error("Evaluator aggregate analysis is not available.");
+    return analysis;
+  }
+
   validate(request: SimulatorRunRequest): SimulatorValidationResponse {
-    const issues =
-      request.workflow === "generator"
+    const issues = [
+      ...(request.workflow === "generator"
         ? validateGenerator(request.config)
-        : validateEvaluator(request.config);
+        : validateEvaluator(request.config)),
+      ...validateNativeStrategy(request)
+    ];
+    if (
+      request.workerThreads !== undefined &&
+      (request.workerThreads < 1 || request.workerThreads > 256)
+    )
+      issues.push({
+        path: "workerThreads",
+        severity: "error",
+        message: "Worker threads must be between 1 and 256, or omitted to use all CPU cores."
+      });
     const command = this.commandFor(request, "<config>", "<output>");
     const estimatedWorkUnits =
       request.workflow === "generator"

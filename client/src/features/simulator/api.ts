@@ -1,4 +1,6 @@
 import type {
+  EvaluatorAggregateAnalysis,
+  GeneratorEvidenceResponse,
   SimulatorComparison,
   SimulatorComparisonRequest,
   SimulatorEvent,
@@ -42,6 +44,13 @@ export const simulatorApi = {
   runs: (includeTrashed = false) =>
     request<SimulatorRunsResponse>("GET", `/runs${includeTrashed ? "?trashed=true" : ""}`),
   run: (id: string) => request<SimulatorRunDetail>("GET", `/runs/${encodeURIComponent(id)}`),
+  generatorEvidence: (id: string) =>
+    request<GeneratorEvidenceResponse>("GET", `/runs/${encodeURIComponent(id)}/generator-evidence`),
+  evaluatorAnalysis: (id: string) =>
+    request<EvaluatorAggregateAnalysis>(
+      "GET",
+      `/runs/${encodeURIComponent(id)}/evaluator-analysis`
+    ),
   validate: (payload: SimulatorRunRequest) =>
     request<SimulatorValidationResponse>("POST", "/validate", payload),
   submit: (payload: SimulatorRunRequest) => request<SimulatorRunDetail>("POST", "/runs", payload),

@@ -120,6 +120,89 @@ export interface SimulatorRunListItem {
   trashedAt?: string;
 }
 
+export interface GeneratorCompositionEvidence {
+  kind: "counterfactual-start" | "continuation-observation";
+  category?: string;
+  sourceCategory?: string;
+  rowKey?: string;
+  sourceRowKey?: string;
+  dealerUpcard: string;
+  trueCount: number;
+  decksRemaining: number;
+  composition?: string;
+  state?: string;
+  action?: string;
+  selectedAction?: string;
+  samples?: number;
+  observations?: number;
+  ev?: number;
+  standardError?: number;
+}
+
+export interface GeneratorCountStratum {
+  category: string;
+  rowKey: string;
+  dealerUpcard: string;
+  decksRemaining: number;
+  runningCount: number;
+  exactTrueCount: number;
+  action: string;
+  samples: number;
+  ev: number;
+  standardError: number;
+}
+
+export interface GeneratorInsuranceResult {
+  trueCount: number;
+  decksRemaining: number;
+  dealerBlackjackProbability: number;
+  takeEv: number;
+  declineEv: number;
+  bestDecision: "take" | "decline";
+  samples: number;
+}
+
+export interface GeneratorEvidenceResponse {
+  composition: GeneratorCompositionEvidence[];
+  countStrata: GeneratorCountStratum[];
+  insurance: GeneratorInsuranceResult[];
+}
+
+export interface EvaluatorAggregateStats {
+  rounds: number;
+  wageredRounds: number;
+  profit: number;
+  profitSquared: number;
+  initialWagers: number;
+  exposure: number;
+  wins: number;
+  losses: number;
+  pushes: number;
+  blackjacks: number;
+  dealerBlackjacks: number;
+  busts: number;
+  surrenders: number;
+  doubles: number;
+  splits: number;
+  insuranceTaken: number;
+  evenMoneyTaken: number;
+}
+
+export interface EvaluatorAggregateAnalysis {
+  artifactVersion: number;
+  evaluatorVersion: string;
+  strategyId: string;
+  mode: StrategyEvaluationRunConfig["mode"];
+  confidenceZ: number;
+  roundsPerHour: number;
+  totals: EvaluatorAggregateStats;
+  pathEvs: number[];
+  paths: Array<{ path: number; stats: EvaluatorAggregateStats; maxDrawdown: number }>;
+  cubes: Array<{ key: string; stats: EvaluatorAggregateStats }>;
+  risk: StrategyEvaluationSummary["riskOfRuin"];
+  maxDrawdownUnits: number;
+}
+
 export interface SimulatorRunDetail extends SimulatorRunListItem {
   config: StrategySimulationConfig | StrategyEvaluationRunConfig;
   strategy?: StrategyEvaluationPackage;
@@ -128,7 +211,11 @@ export interface SimulatorRunDetail extends SimulatorRunListItem {
   artifacts: SimulatorArtifact[];
   reproducibility: SimulatorReproducibility;
   generatorSummary?: StrategySimulationSummary;
+  generatorCompositionEvidence?: GeneratorCompositionEvidence[];
+  generatorCountStrata?: GeneratorCountStratum[];
+  generatorInsuranceResults?: GeneratorInsuranceResult[];
   evaluatorSummary?: StrategyEvaluationSummary;
+  evaluatorAnalysis?: EvaluatorAggregateAnalysis;
 }
 
 export interface SimulatorRunsResponse {

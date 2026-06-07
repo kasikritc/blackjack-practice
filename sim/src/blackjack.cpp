@@ -251,6 +251,148 @@ RoundOutcome simulate_round(const Rules& rules, const std::vector<Rank>& initial
   return out;
 }
 
+CompleteRoundOutcome play_complete_round(const Rules& rules, const CompletePolicy& policy,
+                                         Shoe& shoe, std::mt19937_64& rng,
+                                         int running_count, double initial_wager) {
+  if (initial_wager <= 0.0) throw std::invalid_argument("initial wager must be positive");
+  if (shoe.total < 15) throw std::runtime_error("insufficient cards for a complete round");
+
+  const Shoe before = shoe;
+  const double decks_remaining = static_cast<double>(shoe.total) / 52.0;
+  const double exact_true_count = running_count / decks_remaining;
+  HandState player{{draw_card(shoe, rng)}, initial_wager};
+  std::vector<Rank> dealer{draw_card(shoe, rng)};
+  player.cards.push_back(draw_card(shoe, rng));
+  dealer.push_back(draw_card(shoe, rng));
+
+  CompleteRoundOutcome out;
+  out.initial_wager = initial_wager;
+  out.total_exposure = initial_wager;
+  out.player_blackjack = is_natural(player);
+  out.dealer_blackjack = dealer_natural(dealer);
+
+  if (dealer.front() == Rank::Ace && rules.insurance) {
+    const InsuranceContext context{out.player_blackjack, running_count, decks_remaining,
+                                   exact_true_count};
+    if (policy.choose_insurance(context) == InsuranceDecision::Take) {
+      out.insurance_taken = true;
+      out.even_money_taken = out.player_blackjack;
+      out.total_exposure += initial_wager * 0.5;
+      out.insurance_profit = out.dealer_blackjack ? initial_wager : -initial_wager * 0.5;
+      out.profit += out.insurance_profit;
+    }
+  }
+
+  auto finish = [&]() {
+    out.cards_consumed = before.total - shoe.total;
+    for (int i = 0; i < static_cast<int>(before.counts.size()); ++i) {
+      const int consumed = before.counts[i] - shoe.counts[i];
+      out.running_count_delta += consumed * hi_lo_value(static_cast<Rank>(i));
+    }
+    return out;
+  };
+
+  const auto choose = [&](const HandState& hand, int total_hands, bool initial) {
+    const auto legal = legal_actions(hand, rules, total_hands, initial);
+    if (legal.empty()) throw std::logic_error("policy requested for terminal hand");
+    const DecisionContext context{hand, dealer.front(), rules, legal, total_hands, initial,
+                                  running_count, decks_remaining, exact_true_count};
+    const Action action = policy.choose_action(context);
+    if (!contains(legal, action))
+      throw std::invalid_argument("strategy selected illegal action: " + action_name(action));
+    return action;
+  };
+
+  if (rules.surrender == "early") {
+    const Action action = choose(player, 1, true);
+    if (action == Action::Surrender) {
+      out.profit -= initial_wager * 0.5;
+      out.losses = 1;
+      out.surrenders = 1;
+      return finish();
+    }
+    if (out.dealer_blackjack) {
+      if (out.player_blackjack) out.pushes = 1;
+      else { out.profit -= initial_wager; out.losses = 1; }
+      return finish();
+    }
+    if (out.player_blackjack) {
+      out.profit += initial_wager * natural_payout(rules);
+      out.wins = 1;
+      return finish();
+    }
+    std::vector<HandState> hands{player};
+    if (action == Action::Split) { apply_split(hands, 0, shoe, rng); out.total_exposure += initial_wager; }
+    else { if (action == Action::Double) out.total_exposure += initial_wager; apply_action(action, hands.front(), shoe, rng); }
+    for (size_t index = 0; index < hands.size(); ++index) {
+      while (true) {
+        auto& hand = hands[index];
+        if (hand_value(hand.cards).total >= 21 || hand.stood || hand.surrendered) break;
+        const Action next = choose(hand, static_cast<int>(hands.size()), false);
+        if (next == Action::Split) { apply_split(hands, index, shoe, rng); out.total_exposure += initial_wager; continue; }
+        if (next == Action::Double) out.total_exposure += initial_wager;
+        apply_action(next, hand, shoe, rng);
+      }
+    }
+    out.hands = static_cast<int>(hands.size());
+    bool live = false;
+    for (const auto& hand : hands) if (hand_value(hand.cards).total <= 21) live = true;
+    if (live) while (dealer_should_hit(dealer, rules)) dealer.push_back(draw_card(shoe, rng));
+    const auto dealer_value = hand_value(dealer);
+    for (const auto& hand : hands) {
+      const auto value = hand_value(hand.cards);
+      out.doubles += hand.doubled ? 1 : 0;
+      if (value.total > 21) { out.profit -= hand.bet; ++out.losses; ++out.busts; }
+      else if (dealer_value.total > 21 || value.total > dealer_value.total) { out.profit += hand.bet; ++out.wins; }
+      else if (value.total < dealer_value.total) { out.profit -= hand.bet; ++out.losses; }
+      else ++out.pushes;
+    }
+    return finish();
+  }
+
+  if (out.dealer_blackjack) {
+    if (out.player_blackjack) out.pushes = 1;
+    else { out.profit -= initial_wager; out.losses = 1; }
+    return finish();
+  }
+  if (out.player_blackjack) {
+    out.profit += initial_wager * natural_payout(rules);
+    out.wins = 1;
+    return finish();
+  }
+
+  std::vector<HandState> hands{player};
+  for (size_t index = 0; index < hands.size(); ++index) {
+    bool initial = true;
+    while (true) {
+      auto& hand = hands[index];
+      if (hand_value(hand.cards).total >= 21 || hand.stood || hand.surrendered) break;
+      const Action action = choose(hand, static_cast<int>(hands.size()), initial && !hand.from_split);
+      initial = false;
+      if (action == Action::Split) { apply_split(hands, index, shoe, rng); out.total_exposure += initial_wager; continue; }
+      if (action == Action::Double) out.total_exposure += initial_wager;
+      apply_action(action, hand, shoe, rng);
+    }
+  }
+
+  out.hands = static_cast<int>(hands.size());
+  bool live = false;
+  for (const auto& hand : hands)
+    if (!hand.surrendered && hand_value(hand.cards).total <= 21) live = true;
+  if (live) while (dealer_should_hit(dealer, rules)) dealer.push_back(draw_card(shoe, rng));
+  const auto dealer_value = hand_value(dealer);
+  for (const auto& hand : hands) {
+    const auto value = hand_value(hand.cards);
+    out.doubles += hand.doubled ? 1 : 0;
+    if (hand.surrendered) { out.profit -= hand.bet * 0.5; ++out.losses; ++out.surrenders; }
+    else if (value.total > 21) { out.profit -= hand.bet; ++out.losses; ++out.busts; }
+    else if (dealer_value.total > 21 || value.total > dealer_value.total) { out.profit += hand.bet; ++out.wins; }
+    else if (value.total < dealer_value.total) { out.profit -= hand.bet; ++out.losses; }
+    else ++out.pushes;
+  }
+  return finish();
+}
+
 Action ConservativePolicy::choose(const HandState& hand, Rank, const Rules& rules,
                                   int total_hands) const {
   const auto legal = legal_actions(hand, rules, total_hands, false);

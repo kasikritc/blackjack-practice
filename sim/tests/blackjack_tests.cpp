@@ -129,6 +129,44 @@ void test_split_variations() {
         "no surrender after split");
 }
 
+struct CompleteStandPolicy final : CompletePolicy {
+  Action choose_action(const DecisionContext&) const override { return Action::Stand; }
+};
+
+struct IllegalSurrenderPolicy final : CompletePolicy {
+  Action choose_action(const DecisionContext&) const override { return Action::Surrender; }
+};
+
+void test_complete_round_push_and_count() {
+  CompleteStandPolicy policy;
+  Rules rules;
+  rules.surrender = "none";
+  Shoe shoe = exact_shoe({Rank::Ten, Rank::Ten, Rank::Ten, Rank::Ten, Rank::Ten,
+                          Rank::Ten, Rank::Ten, Rank::Ten, Rank::Ten, Rank::Ten,
+                          Rank::Ten, Rank::Ten, Rank::Ten, Rank::Ten, Rank::Ten});
+  std::mt19937_64 rng(9);
+  const auto outcome = play_complete_round(rules, policy, shoe, rng, 0, 2.0);
+  check(outcome.profit == 0.0 && outcome.pushes == 1, "complete round push");
+  check(outcome.initial_wager == 2.0 && outcome.total_exposure == 2.0,
+        "complete round exposure");
+  check(outcome.cards_consumed == 4 && outcome.running_count_delta == -4,
+        "complete round count delta");
+}
+
+void test_complete_round_rejects_illegal_policy() {
+  IllegalSurrenderPolicy policy;
+  Rules rules;
+  rules.surrender = "none";
+  Shoe shoe = exact_shoe({Rank::Nine, Rank::Nine, Rank::Nine, Rank::Nine, Rank::Nine,
+                          Rank::Nine, Rank::Nine, Rank::Nine, Rank::Nine, Rank::Nine,
+                          Rank::Nine, Rank::Nine, Rank::Nine, Rank::Nine, Rank::Nine});
+  std::mt19937_64 rng(3);
+  bool rejected = false;
+  try { (void)play_complete_round(rules, policy, shoe, rng, 0); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  check(rejected, "illegal complete policy action rejected");
+}
+
 void test_natural_identity() {
   HandState original{{Rank::Ace, Rank::King}};
   HandState split{{Rank::Ace, Rank::King}, 1.0, true, true};
@@ -148,6 +186,8 @@ int main() {
     test_double_restrictions();
     test_split_variations();
     test_peek_and_surrender_timing();
+    test_complete_round_push_and_count();
+    test_complete_round_rejects_illegal_policy();
     std::cout << "blackjack tests passed\n";
     return 0;
   } catch (const std::exception& error) {

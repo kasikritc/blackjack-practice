@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <random>
 #include <string>
@@ -55,6 +56,46 @@ struct RoundOutcome {
   bool dealer_blackjack = false;
 };
 
+enum class InsuranceDecision : uint8_t { Decline, Take };
+
+struct DecisionContext {
+  const HandState& hand;
+  Rank dealer_upcard;
+  const Rules& rules;
+  const std::vector<Action>& legal_actions;
+  int total_hands = 1;
+  bool initial_decision = false;
+  int running_count = 0;
+  double decks_remaining = 0.0;
+  double exact_true_count = 0.0;
+};
+
+struct InsuranceContext {
+  bool player_natural = false;
+  int running_count = 0;
+  double decks_remaining = 0.0;
+  double exact_true_count = 0.0;
+};
+
+class CompletePolicy {
+ public:
+  virtual ~CompletePolicy() = default;
+  virtual Action choose_action(const DecisionContext& context) const = 0;
+  virtual InsuranceDecision choose_insurance(const InsuranceContext&) const {
+    return InsuranceDecision::Decline;
+  }
+};
+
+struct CompleteRoundOutcome : RoundOutcome {
+  double initial_wager = 0.0;
+  double total_exposure = 0.0;
+  double insurance_profit = 0.0;
+  bool insurance_taken = false;
+  bool even_money_taken = false;
+  int cards_consumed = 0;
+  int running_count_delta = 0;
+};
+
 class Policy {
  public:
   virtual ~Policy() = default;
@@ -80,6 +121,9 @@ std::vector<Action> legal_actions(const HandState& hand, const Rules& rules, int
 RoundOutcome simulate_round(const Rules& rules, const std::vector<Rank>& initial_player,
                             Rank dealer_upcard, Action first_action, const Policy& policy,
                             Shoe shoe, std::mt19937_64& rng);
+CompleteRoundOutcome play_complete_round(const Rules& rules, const CompletePolicy& policy,
+                                         Shoe& shoe, std::mt19937_64& rng,
+                                         int running_count, double initial_wager = 1.0);
 
 class ConservativePolicy final : public Policy {
  public:

@@ -15,6 +15,11 @@
 - One chart/import package per true-count and decks-remaining bucket.
 - Strict API rejection of unsupported, unconverged, incomplete, duplicate, or tampered packages.
 - Native unit, configuration, CTest, ASan, and UBSan verification commands.
+- Strict v1 strategy evaluation package and run schemas shared by built-ins, JSON imports, and saved chart exports.
+- Complete-round aggregate evaluator with fresh-round and continuous-shoe modes, true-count betting ramps, play deviations, insurance, and even money.
+- Reproducible path-seeded parallel runs with completed-path checkpoints and resume validation.
+- EV, house edge, path confidence intervals, variance, hourly EV, outcome rates, finite-horizon risk of ruin, drawdown, and count/depth/wager breakdowns.
+- Compressed aggregate, sampled, and full raw artifacts designed for post-run metric computation.
 
 The currently import-validated profile is six-deck H17, DAS, late surrender, 3:2, four split hands,
 no resplit aces, one-card split aces, and exact-rank ten splitting. Other structurally supported
@@ -29,3 +34,5 @@ rule combinations remain non-importable until dedicated conformance fixtures are
   continuation evidence records the frozen policy action and observation frequency; starting
   compositions include per-action EV aggregates.
 - More efficient rare-count reachable-shoe generation for extreme penetration/count requests.
+- Server job orchestration and UI integration for configuring, monitoring, and viewing evaluation runs.
+- A dedicated paired strategy-comparison report over identical path streams.

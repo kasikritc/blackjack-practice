@@ -1,4 +1,13 @@
-# Offline Strategy Simulator
+# Offline Blackjack Simulation
+
+This directory contains two native tools:
+
+- `simulate-strategy` generates strategy evidence and charts.
+- `evaluate-strategy` executes a strict input strategy over complete rounds to measure aggregate EV, house edge, risk, and related statistics.
+
+See [`docs/strategy-evaluator.md`](../docs/strategy-evaluator.md) for the evaluator package schema, saved-chart export, run modes, retention artifacts, and resume workflow.
+
+## Strategy Generator
 
 Native CPU Monte Carlo strategy generator for American hole-card blackjack with dealer peek.
 The current artifact version is `0.3.0`.

@@ -17,11 +17,13 @@ blackjack-practice/
 ├── shared/   @blackjack/shared — TypeScript types shared by client and server
 ├── server/   @blackjack/server — Express + better-sqlite3 REST API
 ├── client/   @blackjack/client — React + Vite single-page app (client-side routing)
+├── sim/      Native strategy generator and aggregate strategy evaluator
 └── data/     blackjack.sqlite (created on first run; git-ignored)
 ```
 
 - **Backend** — Express (TypeScript) serving a JSON API under `/api`, persisting to SQLite via the `better-sqlite3` driver. Routes are split by resource (`sessions`, `events`, `strategy`, `analytics`); analytics aggregation lives in `server/src/services`. In development, non-API browser routes on the API port redirect to the Vite UI so there is one user-facing app URL. In production, the server also serves the built client and falls back to `index.html` so deep links work.
 - **Frontend** — React + Vite. Each drill is a route with its own URL (see below). Game logic lives in framework-agnostic engine modules (`client/src/features/*`) driven by React. Settings persist to `localStorage`.
+- **Native simulation** — C++/OpenMP strategy generation and complete-round aggregate evaluation with versioned JSON inputs and compressed artifacts.
 - **Shared** — request/response DTOs, domain types (cards, Hi-Lo), strategy and settings shapes, used by both sides for end-to-end type safety.
 
 ### Routes
@@ -68,14 +70,18 @@ npm start       # serves the built client + API on http://localhost:5173
 
 ## Scripts
 
-| Command             | Description                             |
-| ------------------- | --------------------------------------- |
-| `npm run dev`       | Run API server + Vite UI in watch mode  |
-| `npm run build`     | Build all three workspaces              |
-| `npm start`         | Serve the production UI + API on `5173` |
-| `npm run typecheck` | Type-check server and client            |
-| `npm run lint`      | Lint the whole repo                     |
-| `npm run format`    | Format with Prettier                    |
+| Command              | Description                             |
+| -------------------- | --------------------------------------- |
+| `npm run dev`        | Run API server + Vite UI in watch mode  |
+| `npm run build`      | Build all three workspaces              |
+| `npm start`          | Serve the production UI + API on `5173` |
+| `npm run typecheck`  | Type-check server and client            |
+| `npm run lint`       | Lint the whole repo                     |
+| `npm run format`     | Format with Prettier                    |
+| `npm run sim:check`  | Build/test/smoke the native simulator   |
+| `npm run eval:smoke` | Smoke-test both evaluator shoe modes    |
+
+The CLI-first aggregate evaluator is documented in [`docs/strategy-evaluator.md`](./docs/strategy-evaluator.md). It accepts strict versioned strategy packages, including exported saved charts, and produces reproducible compressed run artifacts.
 
 On this machine, `play_blackjack_practice` launches the dev servers in the background and prints the one URL to open. Use `5174` for the dev UI; `5173` is the API/prod-build port. If available, `./start-blackjack-practice.sh` / `./stop-blackjack-practice.sh` and `bin-*` wrappers follow the same dev-server split.
 

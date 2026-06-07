@@ -84,6 +84,51 @@ void test_peek_and_surrender_timing() {
   check(!post_peek.dealer_blackjack, "late surrender actions condition on successful peek");
 }
 
+
+void test_dealer_soft_17_rule() {
+  Rules h17;
+  Rules s17;
+  s17.dealer_hits_soft_17 = false;
+  check(dealer_should_hit({Rank::Ace, Rank::Six}, h17), "H17 dealer hit");
+  check(!dealer_should_hit({Rank::Ace, Rank::Six}, s17), "S17 dealer stand");
+}
+
+void test_double_restrictions() {
+  Rules rules;
+  HandState hard_nine{{Rank::Four, Rank::Five}};
+  HandState soft_nine{{Rank::Ace, Rank::Eight}};
+  rules.double_rule = "hardOnly";
+  const auto hard_actions = legal_actions(hard_nine, rules, 1, true);
+  check(std::find(hard_actions.begin(), hard_actions.end(), Action::Double) != hard_actions.end(),
+        "hard-only hard hand");
+  const auto soft_actions = legal_actions(soft_nine, rules, 1, true);
+  check(std::find(soft_actions.begin(), soft_actions.end(), Action::Double) == soft_actions.end(),
+        "hard-only soft hand");
+  rules.double_rule = "tenToEleven";
+  const auto nine_actions = legal_actions(hard_nine, rules, 1, true);
+  check(std::find(nine_actions.begin(), nine_actions.end(), Action::Double) == nine_actions.end(),
+        "ten-to-eleven excludes nine");
+}
+
+void test_split_variations() {
+  Rules rules;
+  HandState split_aces{{Rank::Ace, Rank::Ace}, 1.0, true, true};
+  auto actions = legal_actions(split_aces, rules, 2, false);
+  check(std::find(actions.begin(), actions.end(), Action::Split) == actions.end(),
+        "resplit aces disabled");
+  rules.resplit_aces = true;
+  actions = legal_actions(split_aces, rules, 2, false);
+  check(std::find(actions.begin(), actions.end(), Action::Split) != actions.end(),
+        "resplit aces enabled");
+  actions = legal_actions(split_aces, rules, rules.max_split_hands, false);
+  check(std::find(actions.begin(), actions.end(), Action::Split) == actions.end(),
+        "global split hand limit");
+  HandState split_hand{{Rank::Nine, Rank::Seven}, 1.0, true};
+  actions = legal_actions(split_hand, rules, 2, false);
+  check(std::find(actions.begin(), actions.end(), Action::Surrender) == actions.end(),
+        "no surrender after split");
+}
+
 void test_natural_identity() {
   HandState original{{Rank::Ace, Rank::King}};
   HandState split{{Rank::Ace, Rank::King}, 1.0, true, true};
@@ -99,6 +144,9 @@ int main() {
     test_action_legality();
     test_split_ace_lock();
     test_natural_identity();
+    test_dealer_soft_17_rule();
+    test_double_restrictions();
+    test_split_variations();
     test_peek_and_surrender_timing();
     std::cout << "blackjack tests passed\n";
     return 0;

@@ -315,6 +315,7 @@ ChartPolicy::ChartPolicy(StrategyPackage package) : package_(std::move(package))
 }
 
 Action ChartPolicy::choose_action(const DecisionContext& context) const {
+  if (context.legal_actions.size() == 1) return context.legal_actions.front();
   const auto [category, row] = classify(context.hand, context.rules);
   const std::string dealer = dealer_label(context.dealer_upcard);
   Action action = lookup(package_.chart, category, row, dealer, "chart");

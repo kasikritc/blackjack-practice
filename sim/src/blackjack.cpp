@@ -30,8 +30,9 @@ bool dealer_natural(const std::vector<Rank>& dealer) {
 void apply_split(std::vector<HandState>& hands, size_t index, Shoe& shoe,
                  std::mt19937_64& rng) {
   const Rank rank = hands[index].cards.front();
-  HandState first{{rank, draw_card(shoe, rng)}, 1.0, true, rank == Rank::Ace};
-  HandState second{{rank, draw_card(shoe, rng)}, 1.0, true, rank == Rank::Ace};
+  const double bet = hands[index].bet;
+  HandState first{{rank, draw_card(shoe, rng)}, bet, true, rank == Rank::Ace};
+  HandState second{{rank, draw_card(shoe, rng)}, bet, true, rank == Rank::Ace};
   hands[index] = std::move(first);
   hands.insert(hands.begin() + static_cast<long>(index + 1), std::move(second));
 }

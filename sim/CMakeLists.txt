@@ -36,6 +36,13 @@ add_executable(simulate-strategy
 target_include_directories(simulate-strategy PRIVATE src vendor)
 target_link_libraries(simulate-strategy PRIVATE blackjack_core OpenMP::OpenMP_CXX)
 
+add_executable(evaluate-strategy
+  src/evaluator_main.cpp
+  src/evaluator.cpp
+)
+target_include_directories(evaluate-strategy PRIVATE src vendor)
+target_link_libraries(evaluate-strategy PRIVATE strategy_policy OpenMP::OpenMP_CXX zstd)
+
 if(BUILD_TESTING)
   add_executable(blackjack-tests tests/blackjack_tests.cpp)
   target_include_directories(blackjack-tests PRIVATE src vendor)
@@ -50,10 +57,15 @@ if(BUILD_TESTING)
   target_include_directories(strategy-package-tests PRIVATE src vendor)
   target_link_libraries(strategy-package-tests PRIVATE strategy_policy)
   add_test(NAME strategy-package-tests COMMAND strategy-package-tests)
+  add_test(NAME evaluator-validate COMMAND evaluate-strategy validate --strategy ${CMAKE_CURRENT_SOURCE_DIR}/strategies/basic-6d-h17-das-ls.json)
+  add_test(NAME evaluator-fresh-smoke COMMAND evaluate-strategy run --config ${CMAKE_CURRENT_SOURCE_DIR}/configs/eval-smoke-fresh.json --output /tmp/blackjack-evaluator-ctest)
+  set_tests_properties(evaluator-fresh-smoke PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+  add_test(NAME evaluator-continuous-smoke COMMAND evaluate-strategy run --config ${CMAKE_CURRENT_SOURCE_DIR}/configs/eval-smoke-continuous.json --output /tmp/blackjack-evaluator-ctest)
+  set_tests_properties(evaluator-continuous-smoke PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
 endif()
 
 if(SIM_ENABLE_SANITIZERS)
-  foreach(target blackjack_core strategy_policy blackjack-tests config-tests strategy-package-tests simulate-strategy)
+  foreach(target blackjack_core strategy_policy blackjack-tests config-tests strategy-package-tests simulate-strategy evaluate-strategy)
     target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address,undefined> $<$<COMPILE_LANGUAGE:CXX>:-fno-omit-frame-pointer>)
     target_link_options(${target} PRIVATE -fsanitize=address,undefined)
   endforeach()

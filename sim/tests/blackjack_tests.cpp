@@ -133,6 +133,27 @@ struct CompleteStandPolicy final : CompletePolicy {
   Action choose_action(const DecisionContext&) const override { return Action::Stand; }
 };
 
+struct CompleteSplitPolicy final : CompletePolicy {
+  Action choose_action(const DecisionContext& context) const override {
+    return std::find(context.legal_actions.begin(), context.legal_actions.end(), Action::Split) !=
+      context.legal_actions.end() ? Action::Split : Action::Stand;
+  }
+};
+
+void test_complete_round_preserves_split_wager() {
+  CompleteSplitPolicy policy;
+  Rules rules;
+  rules.surrender = "none";
+  rules.max_split_hands = 2;
+  Shoe shoe = exact_shoe({Rank::Eight, Rank::Eight, Rank::Eight, Rank::Eight, Rank::Eight,
+                          Rank::Eight, Rank::Eight, Rank::Eight, Rank::Eight, Rank::Eight,
+                          Rank::Eight, Rank::Eight, Rank::Eight, Rank::Eight, Rank::Eight});
+  std::mt19937_64 rng(11);
+  const auto outcome = play_complete_round(rules, policy, shoe, rng, 0, 2.0);
+  check(outcome.hands == 2 && outcome.total_exposure == 4.0, "split wager exposure");
+  check(outcome.profit == 4.0, "split wager settlement");
+}
+
 struct IllegalSurrenderPolicy final : CompletePolicy {
   Action choose_action(const DecisionContext&) const override { return Action::Surrender; }
 };
@@ -187,6 +208,7 @@ int main() {
     test_split_variations();
     test_peek_and_surrender_timing();
     test_complete_round_push_and_count();
+    test_complete_round_preserves_split_wager();
     test_complete_round_rejects_illegal_policy();
     std::cout << "blackjack tests passed\n";
     return 0;

@@ -55,6 +55,15 @@ void test_side_decisions() {
         "even money policy");
 }
 
+void test_validation_rejects_mechanically_illegal_action() {
+  auto package = package_fixture();
+  package.chart["hard"]["h4"]["2"] = Action::Double;
+  package.fallbacks["hard"]["h4"]["2"] = Action::Hit;
+  bool rejected = false;
+  try { validate_strategy_package(package); } catch (const std::invalid_argument&) { rejected = true; }
+  check(rejected, "mechanically illegal chart action rejected");
+}
+
 void test_validation_rejects_unordered_deviations() {
   auto package = package_fixture();
   package.deviations.push_back({"hard", "h16", "10", ThresholdComparison::AtOrAbove, 3, Action::Hit});
@@ -87,6 +96,7 @@ int main() {
     test_chart_policy_deviation_and_ramp();
     test_side_decisions();
     test_validation_rejects_unordered_deviations();
+    test_validation_rejects_mechanically_illegal_action();
     test_validation_rejects_missing_cell();
     test_parser_rejects_unknown_field();
     std::cout << "strategy package tests passed\n";

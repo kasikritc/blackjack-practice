@@ -120,6 +120,43 @@ std::vector<std::string> expected_rows(const std::string& category) {
 
 const std::vector<std::string> kDealers{"2", "3", "4", "5", "6", "7", "8", "9", "10", "A"};
 
+HandState representative_hand(const std::string& category, const std::string& row,
+                              const Rules& rules) {
+  if (category == "pair") {
+    const std::string label = row.substr(1);
+    const Rank rank = label == "10" ? Rank::Ten : parse_rank(label);
+    return HandState{{rank, rank}};
+  }
+  const int total = std::stoi(row.substr(1));
+  if (category == "soft") {
+    if (total == 21) return HandState{{Rank::Ace, Rank::Five, Rank::Five}};
+    return HandState{{Rank::Ace, static_cast<Rank>(total - 12)}};
+  }
+  if (total == 4) return HandState{{Rank::Two, Rank::Two}};
+  if (total == 20) return HandState{{Rank::Five, Rank::Five, Rank::Ten}};
+  if (total == 21) return HandState{{Rank::Five, Rank::Six, Rank::Ten}};
+  for (int a = 2; a <= 10; ++a) {
+    for (int b = 2; b <= 10; ++b) {
+      if (a == b || a + b != total) continue;
+      return HandState{{static_cast<Rank>(a - 1), static_cast<Rank>(b - 1)}};
+    }
+  }
+  (void)rules;
+  throw std::invalid_argument("no representative hand for " + category + ":" + row);
+}
+
+bool mechanically_legal(Action action, const std::string& category, const std::string& row,
+                        const Rules& rules) {
+  const HandState hand = representative_hand(category, row, rules);
+  auto legal = legal_actions(hand, rules, 1, true);
+  if (category != "pair") legal.erase(std::remove(legal.begin(), legal.end(), Action::Split), legal.end());
+  if (category == "hard" && row == "h4") {
+    legal.erase(std::remove(legal.begin(), legal.end(), Action::Double), legal.end());
+    legal.erase(std::remove(legal.begin(), legal.end(), Action::Surrender), legal.end());
+  }
+  return std::find(legal.begin(), legal.end(), action) != legal.end();
+}
+
 bool requires_fallback(Action action) {
   return action == Action::Double || action == Action::Surrender || action == Action::Split;
 }
@@ -255,11 +292,29 @@ void validate_strategy_package(const StrategyPackage& package) {
           throw std::invalid_argument("surrender action under no-surrender rules");
         if (action == Action::Double && package.rules.double_rule == "none")
           throw std::invalid_argument("double action under no-double rules");
+        if (!mechanically_legal(action, category, row, package.rules))
+          throw std::invalid_argument("mechanically illegal chart action: " + category + ":" + row + ":" + dealer);
         if (requires_fallback(action)) {
           const Action fallback = lookup(package.fallbacks, category, row, dealer, "fallback");
           if (fallback != Action::Hit && fallback != Action::Stand)
             throw std::invalid_argument("fallback must be hit or stand");
         }
+      }
+    }
+  }
+
+  for (const auto& [category, rows] : package.fallbacks) {
+    const auto expected = expected_rows(category);
+    const std::set<std::string> expected_set(expected.begin(), expected.end());
+    if (!std::set<std::string>{"hard", "soft", "pair"}.contains(category))
+      throw std::invalid_argument("unknown fallback category: " + category);
+    for (const auto& [row, dealers] : rows) {
+      if (!expected_set.contains(row)) throw std::invalid_argument("unknown fallback row: " + row);
+      for (const auto& [dealer, action] : dealers) {
+        if (std::find(kDealers.begin(), kDealers.end(), dealer) == kDealers.end())
+          throw std::invalid_argument("unknown fallback dealer: " + dealer);
+        if (action != Action::Hit && action != Action::Stand)
+          throw std::invalid_argument("fallback must be hit or stand");
       }
     }
   }
@@ -271,6 +326,8 @@ void validate_strategy_package(const StrategyPackage& package) {
     (void)lookup(package.chart, deviation.category, deviation.row_key, deviation.dealer, "deviation target");
     if (deviation.action == Action::Split && deviation.category != "pair")
       throw std::invalid_argument("split deviation outside pair chart");
+    if (!mechanically_legal(deviation.action, deviation.category, deviation.row_key, package.rules))
+      throw std::invalid_argument("mechanically illegal deviation action");
     if (requires_fallback(deviation.action) && !deviation.has_fallback)
       throw std::invalid_argument("double, surrender, and split deviations require fallback");
     if (deviation.has_fallback && deviation.fallback != Action::Hit && deviation.fallback != Action::Stand)

@@ -35,7 +35,7 @@ export function ImportReview({
         );
       })
       .catch(() => setMessage("Start the main practice server to compare and import charts."));
-  }, []);
+  }, [packageBody.rules]);
 
   const currentChart = data?.charts.find(chart => chart.id === chartId);
   const currentProfile = data?.profiles.find(profile => profile.id === currentChart?.ruleProfileId);

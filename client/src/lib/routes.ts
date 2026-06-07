@@ -5,7 +5,8 @@ export const DRILL_PATHS: Record<Exclude<DrillMode, "home">, string> = {
   table: "/table-practice",
   flash: "/flash-count",
   strategy: "/basic-strategy",
-  deckCountdown: "/deck-countdown"
+  deckCountdown: "/deck-countdown",
+  simulator: "/simulator"
 };
 
 export interface DrillMeta {
@@ -47,5 +48,13 @@ export const DRILLS: DrillMeta[] = [
     tagline: "Full deck speed",
     description:
       "Flip through complete shuffled decks and submit the ending Hi-Lo count. Built for speed and accuracy."
+  },
+  {
+    mode: "simulator",
+    path: DRILL_PATHS.simulator,
+    title: "Simulator",
+    tagline: "Strategy laboratory",
+    description:
+      "Generate strategy evidence, evaluate complete systems, monitor native runs, and compare results."
   }
 ];

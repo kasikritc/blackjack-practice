@@ -41,7 +41,7 @@ export interface Card {
 export type SeatRole = "player" | "dealer" | "other";
 
 /** The drill currently being played; also the basis for the route slug. */
-export type DrillMode = "home" | "table" | "flash" | "strategy" | "deckCountdown";
+export type DrillMode = "home" | "table" | "flash" | "strategy" | "deckCountdown" | "simulator";
 
 /** Hi-Lo running-count value for a rank: +1 low (2-6), 0 neutral (7-9), -1 high (10-A). */
 export function hiLoValue(rank: Rank): number {

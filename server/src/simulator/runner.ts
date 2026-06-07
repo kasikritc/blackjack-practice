@@ -301,6 +301,7 @@ export class SimulatorRunner {
   private listeners = new Set<Listener>();
   private children = new Map<string, ChildProcess>();
   private pumping = false;
+  private shuttingDown = false;
 
   constructor(store = new SimulatorStore()) {
     this.store = store;
@@ -310,6 +311,30 @@ export class SimulatorRunner {
     this.indexLegacyRuns();
     this.store.markInterruptedForRestart();
     void this.pump();
+  }
+
+  async shutdown(): Promise<void> {
+    if (this.shuttingDown) return;
+    this.shuttingDown = true;
+    const active = [...this.children.entries()];
+    for (const [id] of active) this.store.requeue(id);
+    for (const [, child] of active) child.kill("SIGTERM");
+    await Promise.all(
+      active.map(
+        ([, child]) =>
+          new Promise<void>(resolve => {
+            if (child.exitCode !== null || child.signalCode !== null) return resolve();
+            const timeout = setTimeout(() => {
+              child.kill("SIGKILL");
+              resolve();
+            }, 4500);
+            child.once("close", () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+          })
+      )
+    );
   }
 
   subscribe(listener: Listener): () => void {
@@ -538,10 +563,10 @@ export class SimulatorRunner {
   }
 
   private async pump(): Promise<void> {
-    if (this.pumping) return;
+    if (this.pumping || this.shuttingDown) return;
     this.pumping = true;
     try {
-      while (this.children.size < SIM_CONCURRENCY) {
+      while (!this.shuttingDown && this.children.size < SIM_CONCURRENCY) {
         const next = this.store.queued()[0];
         if (!next) break;
         void this.execute(next);
@@ -617,6 +642,7 @@ export class SimulatorRunner {
       clearInterval(poll);
       this.children.delete(run.id);
       this.pollProgress(run.id, outputBase);
+      if (this.shuttingDown) return;
       const current = this.store.detail(run.id)!;
       const cancelled = current.status === "cancelling";
       const completedAt = new Date().toISOString();

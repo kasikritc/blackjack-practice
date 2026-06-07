@@ -13,7 +13,7 @@ export function ImportReview({
   const [data, setData] = useState<StrategyData | null>(null);
   const [chartId, setChartId] = useState<number | null>(null);
   const [minimumMargin, setMinimumMargin] = useState(0);
-  const [reviewed, setReviewed] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,12 +23,25 @@ export function ImportReview({
       .getStrategy()
       .then(next => {
         setData(next);
-        setChartId(next.charts[0]?.id || null);
+        const compatibleProfileIds = new Set(
+          next.profiles
+            .filter(profile => JSON.stringify(profile.rules) === JSON.stringify(packageBody.rules))
+            .map(profile => profile.id)
+        );
+        setChartId(
+          next.charts.find(chart => compatibleProfileIds.has(chart.ruleProfileId))?.id ||
+            next.charts[0]?.id ||
+            null
+        );
       })
       .catch(() => setMessage("Start the main practice server to compare and import charts."));
   }, []);
 
   const currentChart = data?.charts.find(chart => chart.id === chartId);
+  const currentProfile = data?.profiles.find(profile => profile.id === currentChart?.ruleProfileId);
+  const rulesMatch =
+    Boolean(currentProfile) &&
+    JSON.stringify(currentProfile?.rules) === JSON.stringify(packageBody.rules);
   const changedCells = useMemo(() => {
     if (!currentChart) return [];
     return packageBody.cells.filter(cell => {
@@ -36,6 +49,16 @@ export function ImportReview({
       return current !== cell.bestAction;
     });
   }, [currentChart, packageBody.cells]);
+  const selectedCells = changedCells.filter(cell =>
+    selected.has(`${cell.category}:${cell.rowKey}:${cell.dealerUpcard}`)
+  );
+
+  useEffect(() => {
+    setSelected(
+      new Set(changedCells.map(cell => `${cell.category}:${cell.rowKey}:${cell.dealerUpcard}`))
+    );
+    setConfirmed(false);
+  }, [chartId, packageBody, changedCells]);
 
   const validityGates = [
     {
@@ -45,6 +68,7 @@ export function ImportReview({
         packageBody.validation.totalDependent
     },
     { label: "Simulator-validated rule profile", pass: packageBody.validation.fullySupported },
+    { label: "Base chart rules exactly match generated rules", pass: rulesMatch },
     { label: "All 370 required cells present", pass: packageBody.cells.length === 370 },
     {
       label: "Every cell converged with high confidence",
@@ -53,18 +77,16 @@ export function ImportReview({
         packageBody.cells.every(cell => cell.converged && cell.confidence === "high")
     },
     {
-      label: `Every winner margin meets ${minimumMargin}`,
-      pass: packageBody.cells.every(cell => cell.winnerMargin >= minimumMargin)
+      label: `Selected winner margins meet ${minimumMargin}`,
+      pass:
+        selectedCells.length > 0 && selectedCells.every(cell => cell.winnerMargin >= minimumMargin)
     }
   ];
   const allGatesPass = validityGates.every(gate => gate.pass);
-  const reviewComplete = changedCells.every(cell =>
-    reviewed.has(`${cell.category}:${cell.rowKey}:${cell.dealerUpcard}`)
-  );
-  const canImport = allGatesPass && reviewComplete && confirmed && Boolean(data);
+  const canImport = allGatesPass && confirmed && Boolean(data && chartId);
 
-  const toggleReviewed = (key: string) => {
-    setReviewed(current => {
+  const toggleSelected = (key: string) => {
+    setSelected(current => {
       const next = new Set(current);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -76,7 +98,11 @@ export function ImportReview({
     if (!canImport) return;
     setBusy(true);
     try {
-      const result = await api.importGeneratedChart(packageBody);
+      const result = await api.importGeneratedChart({
+        ...packageBody,
+        baseChartId: chartId!,
+        selectedCellKeys: [...selected]
+      });
       setMessage(`Imported as chart ${result.chartId}.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import failed.");
@@ -151,9 +177,9 @@ export function ImportReview({
                 <strong>{changedCells.length}</strong>
               </div>
               <div>
-                <span>Reviewed changes</span>
+                <span>Selected changes</span>
                 <strong>
-                  {reviewed.size}/{changedCells.length}
+                  {selected.size}/{changedCells.length}
                 </strong>
               </div>
             </div>
@@ -164,23 +190,25 @@ export function ImportReview({
               <div>
                 <h4>Strategy changes</h4>
                 <p>
-                  Select changes as you review their evidence. Import remains atomic and complete.
+                  Choose exactly which generated decisions replace cells in the selected base chart.
                 </p>
               </div>
               <button
                 type="button"
                 className="ghost-button"
                 onClick={() =>
-                  setReviewed(
-                    new Set(
-                      changedCells.map(
-                        cell => `${cell.category}:${cell.rowKey}:${cell.dealerUpcard}`
-                      )
-                    )
+                  setSelected(
+                    selected.size === changedCells.length
+                      ? new Set()
+                      : new Set(
+                          changedCells.map(
+                            cell => `${cell.category}:${cell.rowKey}:${cell.dealerUpcard}`
+                          )
+                        )
                   )
                 }
               >
-                Mark all reviewed
+                {selected.size === changedCells.length ? "Clear selection" : "Select all changes"}
               </button>
             </div>
             <div className="sim-change-list">
@@ -190,11 +218,11 @@ export function ImportReview({
                   const current =
                     currentChart?.chart[cell.category]?.[cell.rowKey]?.[cell.dealerUpcard];
                   return (
-                    <label key={key} className={reviewed.has(key) ? "is-reviewed" : ""}>
+                    <label key={key} className={selected.has(key) ? "is-reviewed" : ""}>
                       <input
                         type="checkbox"
-                        checked={reviewed.has(key)}
-                        onChange={() => toggleReviewed(key)}
+                        checked={selected.has(key)}
+                        onChange={() => toggleSelected(key)}
                       />
                       <strong>
                         {cell.category} {cell.rowKey} vs {cell.dealerUpcard}
@@ -218,10 +246,10 @@ export function ImportReview({
         <footer>
           <div>
             <ToggleField
-              label="I approve creating this complete chart"
+              label="I approve creating this merged chart"
               checked={confirmed}
               onChange={setConfirmed}
-              hint="The selected cells above are a review checklist, not a partial import."
+              hint="Only selected generated cells will replace decisions in the base chart."
             />
             {message ? <p className="sim-review-message">{message}</p> : null}
           </div>
@@ -230,7 +258,7 @@ export function ImportReview({
             disabled={!canImport || busy}
             onClick={() => void importChart()}
           >
-            {busy ? "Importing…" : "Import complete chart"}
+            {busy ? "Importing…" : `Import ${selected.size} selected cells`}
           </button>
         </footer>
       </div>

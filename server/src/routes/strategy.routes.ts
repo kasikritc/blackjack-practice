@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   STRATEGY_ACTIONS,
   STRATEGY_DEALER_UPCARDS,
+  type StrategyChart,
   type StrategyChartImportRequest,
   type StrategyCategory
 } from "@blackjack/shared";
@@ -157,6 +158,56 @@ strategyRouter.patch("/strategy/charts/:id", (req, res) => {
   res.status(200).json({ ok: true, ...strategyData() });
 });
 
+function mergedImportChart(packageBody: StrategyChartImportRequest): {
+  chart: StrategyChart;
+  ruleProfileId?: number;
+  error?: string;
+} {
+  if (packageBody.selectedCellKeys === undefined) return { chart: packageBody.chart };
+  if (!packageBody.baseChartId)
+    return { chart: packageBody.chart, error: "partial import requires a base chart" };
+  const selected = new Set(packageBody.selectedCellKeys);
+  if (!selected.size)
+    return { chart: packageBody.chart, error: "select at least one strategy cell" };
+  const evidence = new Map(
+    packageBody.cells.map(cell => [`${cell.category}:${cell.rowKey}:${cell.dealerUpcard}`, cell])
+  );
+  for (const key of selected)
+    if (!evidence.has(key))
+      return { chart: packageBody.chart, error: `unknown selected cell: ${key}` };
+  const base = queryAll(
+    `SELECT c.rule_profile_id, c.chart_json, p.rules_json
+     FROM strategy_charts c
+     JOIN strategy_rule_profiles p ON p.id = c.rule_profile_id
+     WHERE c.id = ${Number(packageBody.baseChartId)} LIMIT 1`
+  )[0];
+  if (!base) return { chart: packageBody.chart, error: "base chart not found" };
+  if (base.rules_json !== JSON.stringify(packageBody.rules))
+    return {
+      chart: packageBody.chart,
+      error: "base chart rules do not match generated chart rules"
+    };
+  const chart = structuredClone(
+    backfillStrategyFallbacks(parseSettingsJson(base.chart_json))
+  ) as StrategyChart;
+  const generated = backfillStrategyFallbacks(packageBody.chart) as StrategyChart;
+  for (const key of selected) {
+    const cell = evidence.get(key)!;
+    chart[cell.category][cell.rowKey][cell.dealerUpcard] =
+      generated[cell.category][cell.rowKey][cell.dealerUpcard];
+    const fallback = generated.fallbacks?.[cell.category]?.[cell.rowKey]?.[cell.dealerUpcard];
+    if (fallback) {
+      chart.fallbacks ||= {};
+      chart.fallbacks[cell.category] ||= {};
+      chart.fallbacks[cell.category]![cell.rowKey] ||= {};
+      chart.fallbacks[cell.category]![cell.rowKey][cell.dealerUpcard] = fallback;
+    } else if (chart.fallbacks?.[cell.category]?.[cell.rowKey]) {
+      delete chart.fallbacks[cell.category]![cell.rowKey][cell.dealerUpcard];
+    }
+  }
+  return { chart, ruleProfileId: Number(base.rule_profile_id) };
+}
+
 strategyRouter.post("/strategy/charts/import", (req, res) => {
   const body = (req.body || {}) as Partial<StrategyChartImportRequest>;
   const validationError = validateImportPackage(body);
@@ -165,10 +216,17 @@ strategyRouter.post("/strategy/charts/import", (req, res) => {
     return;
   }
   const packageBody = body as StrategyChartImportRequest;
+  const merged = mergedImportChart(packageBody);
+  if (merged.error) {
+    res.status(400).json({ error: merged.error });
+    return;
+  }
   const rulesJson = JSON.stringify(packageBody.rules);
-  let profile = queryAll(
-    `SELECT id FROM strategy_rule_profiles WHERE rules_json = ${sqlValue(rulesJson)} LIMIT 1`
-  )[0];
+  let profile = merged.ruleProfileId
+    ? { id: merged.ruleProfileId }
+    : queryAll(
+        `SELECT id FROM strategy_rule_profiles WHERE rules_json = ${sqlValue(rulesJson)} LIMIT 1`
+      )[0];
   if (!profile) {
     profile = insert("strategy_rule_profiles", {
       name: `Generated rules - ${packageBody.name}`,
@@ -178,7 +236,7 @@ strategyRouter.post("/strategy/charts/import", (req, res) => {
   const chart = insert("strategy_charts", {
     rule_profile_id: profile.id,
     name: packageBody.name,
-    chart_json: JSON.stringify(packageBody.chart)
+    chart_json: JSON.stringify(merged.chart)
   });
   createChartSubsets(chart.id);
   insert("strategy_chart_imports", {
@@ -187,7 +245,11 @@ strategyRouter.post("/strategy/charts/import", (req, res) => {
     seed: packageBody.source.seed,
     true_count: packageBody.source.trueCount,
     artifact_path: packageBody.source.artifactPath,
-    source_json: JSON.stringify(packageBody.source)
+    source_json: JSON.stringify({
+      ...packageBody.source,
+      baseChartId: packageBody.baseChartId,
+      selectedCellKeys: packageBody.selectedCellKeys
+    })
   });
   res.status(201).json({
     ok: true,

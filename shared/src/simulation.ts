@@ -112,7 +112,10 @@ export interface StrategyChartImportPackage {
   };
 }
 
-export type StrategyChartImportRequest = StrategyChartImportPackage;
+export interface StrategyChartImportRequest extends StrategyChartImportPackage {
+  baseChartId?: number;
+  selectedCellKeys?: string[];
+}
 
 export interface StrategyChartImportResponse {
   id: number;

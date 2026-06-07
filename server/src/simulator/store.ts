@@ -91,6 +91,14 @@ export class SimulatorStore {
       );
       CREATE INDEX IF NOT EXISTS simulator_runs_status_idx
         ON simulator_runs(status, queue_position, created_at);
+      CREATE TABLE IF NOT EXISTS simulator_run_logs (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        line TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS simulator_run_logs_run_idx
+        ON simulator_run_logs(run_id, sequence);
     `);
   }
 
@@ -190,7 +198,14 @@ export class SimulatorStore {
       config: parse(row.config_json, {} as SimulatorRunDetail["config"]),
       strategy: parse<StrategyEvaluationPackage | undefined>(row.strategy_json, undefined),
       outputDirectory: row.output_directory || undefined,
-      logs: parse<string[]>(row.logs_json, []),
+      logs: [
+        ...parse<string[]>(row.logs_json, []),
+        ...(
+          this.db
+            .prepare("SELECT line FROM simulator_run_logs WHERE run_id = ? ORDER BY sequence")
+            .all(id) as Array<{ line: string }>
+        ).map(entry => entry.line)
+      ],
       artifacts: [],
       reproducibility: parse<SimulatorReproducibility>(row.reproducibility_json, {})
     };
@@ -243,12 +258,11 @@ export class SimulatorStore {
       .run(...parameters, id);
   }
 
-  appendLog(id: string, line: string): string[] {
-    const run = this.detail(id);
-    if (!run) return [];
-    const logs = [...run.logs, line].slice(-2000);
-    this.update(id, { logs });
-    return logs;
+  appendLog(id: string, line: string): void {
+    if (!this.has(id)) return;
+    this.db
+      .prepare("INSERT INTO simulator_run_logs (run_id, created_at, line) VALUES (?, ?, ?)")
+      .run(id, new Date().toISOString(), line);
   }
 
   nextQueuePosition(): number {
@@ -286,6 +300,9 @@ export class SimulatorStore {
   }
 
   remove(id: string): void {
-    this.db.prepare("DELETE FROM simulator_runs WHERE id = ?").run(id);
+    this.db.transaction(() => {
+      this.db.prepare("DELETE FROM simulator_run_logs WHERE run_id = ?").run(id);
+      this.db.prepare("DELETE FROM simulator_runs WHERE id = ?").run(id);
+    })();
   }
 }

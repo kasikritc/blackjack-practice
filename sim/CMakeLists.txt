@@ -14,9 +14,13 @@ option(SIM_ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" 
 add_library(sim_cuda OBJECT src/cuda_probe.cu)
 set_target_properties(sim_cuda PROPERTIES CUDA_ARCHITECTURES native)
 
+add_library(blackjack_core STATIC
+  src/blackjack.cpp
+)
+target_include_directories(blackjack_core PUBLIC src)
+
 add_executable(simulate-strategy
   src/main.cpp
-  src/blackjack.cpp
   src/config.cpp
   src/simulator.cpp
   src/artifacts.cpp
@@ -24,20 +28,22 @@ add_executable(simulate-strategy
 )
 
 target_include_directories(simulate-strategy PRIVATE src vendor)
-target_link_libraries(simulate-strategy PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(simulate-strategy PRIVATE blackjack_core OpenMP::OpenMP_CXX)
 
 if(BUILD_TESTING)
-  add_executable(blackjack-tests tests/blackjack_tests.cpp src/blackjack.cpp)
+  add_executable(blackjack-tests tests/blackjack_tests.cpp)
   target_include_directories(blackjack-tests PRIVATE src vendor)
+  target_link_libraries(blackjack-tests PRIVATE blackjack_core)
   add_test(NAME blackjack-tests COMMAND blackjack-tests)
-  add_executable(config-tests tests/config_tests.cpp src/config.cpp src/blackjack.cpp)
+  add_executable(config-tests tests/config_tests.cpp src/config.cpp)
   target_include_directories(config-tests PRIVATE src vendor)
+  target_link_libraries(config-tests PRIVATE blackjack_core)
   target_compile_definitions(config-tests PRIVATE SIM_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   add_test(NAME config-tests COMMAND config-tests)
 endif()
 
 if(SIM_ENABLE_SANITIZERS)
-  foreach(target blackjack-tests config-tests simulate-strategy)
+  foreach(target blackjack_core blackjack-tests config-tests simulate-strategy)
     target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address,undefined> $<$<COMPILE_LANGUAGE:CXX>:-fno-omit-frame-pointer>)
     target_link_options(${target} PRIVATE -fsanitize=address,undefined)
   endforeach()

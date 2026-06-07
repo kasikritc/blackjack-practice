@@ -78,7 +78,7 @@ export function SimulatorWorkspace() {
                 ? "Start npm run dev:sim"
                 : active
                   ? `${active.name} · ${queued} queued`
-                  : `${health?.machine.cpuCores || "?"} CPU cores · ${health?.cudaDevices ?? "?"} CUDA devices · ${queued} queued`}
+                  : `${health?.machine.cpuCores || "?"} CPU cores · ${health?.cudaDevices ?? "?"} CUDA ${health?.cudaDevices === 1 ? "device" : "devices"} · ${queued} queued`}
             </small>
           </div>
         </div>

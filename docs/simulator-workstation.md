@@ -48,7 +48,7 @@ The guided view exposes identity, target buckets, worker count, true-count round
 - Searchable counterfactual starting-composition and continuation-observation evidence.
 - Searchable exact running-count strata with EV and standard error.
 - Independent insurance probability, take/decline EV, selected decision, and shoe sample count.
-- Chart JSON, import package, summary, manifest, composition, count-strata, and insurance artifacts.
+- Direct selected-bucket chart export plus chart JSON, import package, summary, manifest, composition, count-strata, and insurance artifacts.
 
 ## Performance Evaluator settings
 
@@ -72,16 +72,17 @@ The guided view exposes the strategy source and run structure. Expert mode visua
 - Profit per table round/unit exposed, variance, standard deviation, and standard error.
 - Win, loss, push, blackjack, dealer-blackjack, bust, surrender, double, split, insurance, and even-money rates.
 - Finite-horizon risk of ruin for every configured bankroll threshold.
-- Independent path-EV distribution and path count.
-- Searchable true-count/depth/wager cubes with rounds, profit, EV, and exposure.
-- Manifest, summary, compressed aggregate, path checkpoints, and sampled/full raw artifacts.
+- Selectable independent path-EV distribution with complete per-path sufficient statistics and maximum drawdown.
+- Searchable true-count/depth/wager cubes with drill-down into every retained outcome and exposure statistic.
+- Memory-bounded, paginated inspection of sampled/full compressed raw round records by path.
+- Manifest, summary, compressed aggregate, path checkpoints, and sampled/full raw artifacts; completed summaries can be regenerated through the native `summarize` command.
 
 ## Run lifecycle and reproducibility
 
 - Sequential durable queue with live SSE updates and polling fallback.
 - Cooperative cancellation; queued work cancels immediately. Evaluator recovery reuses completed path checkpoints. Optimizer recovery restarts the deterministic workload from its original configuration.
 - Search by name, ID, or tag; filter by workflow/status; inline rename; rerun; recoverable trash; restore; permanent purge.
-- Complete append-only process logs, normalized configuration, immutable evaluator strategy package, executed command, output artifacts, timing, random seed, simulator version, Git commit/dirty state, worker count, hostname, platform, CPU, core count, and memory.
+- Complete append-only process logs, normalized configuration, immutable evaluator strategy package, executed command, every output artifact, timing, random seed, simulator version, Git commit/dirty state, worker count, hostname, platform, architecture, CPU, core count, memory, and native CUDA device probe.
 - Existing CLI run directories are indexed read-only where possible. Obsolete generator schemas remain browsable/comparable but cannot be rerun as current configurations.
 
 ## Comparison
@@ -99,7 +100,8 @@ Import is never one click. The review dialog requires:
 - convergence and high confidence for every cell;
 - a user-selected minimum winner margin;
 - comparison against a selected current chart;
-- manual review selection for every changed cell;
-- a final approval acknowledgement and summary.
+- exact rule compatibility with a user-selected saved base chart;
+- manual inclusion or exclusion of every changed cell;
+- a final approval acknowledgement and selected-cell summary.
 
-The import remains atomic: the selected bucket becomes a complete new rule profile/chart record only after every gate passes.
+The generated package is always validated as a complete 370-cell artifact first. Import then creates a new chart atomically by copying the base chart and replacing only the selected generated actions and fallbacks. The base chart ID and selected cell keys are retained in import provenance.

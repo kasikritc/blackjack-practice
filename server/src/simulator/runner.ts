@@ -46,6 +46,46 @@ function readJson<T>(file: string): T | undefined {
   }
 }
 
+function bucketSlug(trueCount: number, decksRemaining: number): string {
+  return `tc${trueCount >= 0 ? "+" : ""}${trueCount}-dr${decksRemaining.toFixed(2)}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function normalizeGeneratorSummary(
+  output: string,
+  summary: StrategySimulationSummary | undefined
+): StrategySimulationSummary | undefined {
+  if (!summary) return undefined;
+  const firstCell = summary.cells[0];
+  const legacyChart = readJson<StrategySimulationSummary["charts"][string]>(
+    path.join(output, "chart.json")
+  );
+  const charts =
+    summary.charts && Object.keys(summary.charts).length
+      ? summary.charts
+      : firstCell && legacyChart
+        ? { [bucketSlug(firstCell.trueCount, firstCell.decksRemaining)]: legacyChart }
+        : {};
+  return {
+    ...summary,
+    charts,
+    cells: summary.cells.map(cell => {
+      const winningAction = cell.actions.find(action => action.action === cell.bestAction);
+      return {
+        ...cell,
+        meanExactTrueCount: cell.meanExactTrueCount ?? cell.trueCount,
+        pairedStandardError: cell.pairedStandardError ?? winningAction?.standardError ?? 0,
+        pairedConfidenceLow: cell.pairedConfidenceLow ?? cell.winnerMargin,
+        pairedConfidenceHigh: cell.pairedConfidenceHigh ?? cell.winnerMargin,
+        confidence: cell.confidence ?? (cell.converged ? "high" : "low"),
+        stopReason: cell.stopReason ?? (cell.converged ? "paired-confidence" : "sample-cap")
+      };
+    })
+  };
+}
+
 function compactDate(value: unknown): string {
   if (typeof value !== "string") return new Date().toISOString();
   if (/^\d{8}T\d{6}Z$/.test(value)) {
@@ -214,8 +254,9 @@ export class SimulatorRunner {
     const output = run.outputDirectory;
     run.artifacts = output ? artifactFiles(output) : [];
     if (output && run.workflow === "generator")
-      run.generatorSummary = readJson<StrategySimulationSummary>(
-        path.join(output, "simulation-summary.json")
+      run.generatorSummary = normalizeGeneratorSummary(
+        output,
+        readJson<StrategySimulationSummary>(path.join(output, "simulation-summary.json"))
       );
     if (output && run.workflow === "evaluator")
       run.evaluatorSummary = readJson<StrategyEvaluationSummary>(path.join(output, "summary.json"));

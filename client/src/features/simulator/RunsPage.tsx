@@ -30,6 +30,13 @@ function formatDuration(milliseconds?: number): string {
   return `${minutes}m ${Math.round(seconds % 60)}s`;
 }
 
+function canRerun(detail: SimulatorRunDetail): boolean {
+  return (
+    detail.workflow === "evaluator" ||
+    typeof (detail.config as { minSamplesPerAction?: unknown }).minSamplesPerAction === "number"
+  );
+}
+
 function RunCard({
   run,
   selected,
@@ -267,13 +274,21 @@ export function RunsPage() {
                     Resume
                   </button>
                 ) : null}
-                {detail.status === "completed" ? (
+                {detail.status === "completed" && canRerun(detail) ? (
                   <button
                     className="ghost-button"
                     onClick={() => void action(() => simulatorApi.rerun(detail.id))}
                   >
                     Rerun
                   </button>
+                ) : null}
+                {detail.status === "completed" && !canRerun(detail) ? (
+                  <span
+                    className="sim-legacy-note"
+                    title="Legacy runs use an obsolete configuration schema."
+                  >
+                    Legacy schema
+                  </span>
                 ) : null}
                 {detail.status === "trashed" ? (
                   <>

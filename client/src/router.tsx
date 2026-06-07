@@ -1,9 +1,9 @@
 import { Navigate, createBrowserRouter } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { SimulatorPlaceholder } from "./features/simulator/SimulatorPlaceholder";
 import { StrategyGeneratorPage } from "./features/simulator/StrategyGeneratorPage";
 import { EvaluatorPage } from "./features/simulator/EvaluatorPage";
 import { RunsPage } from "./features/simulator/RunsPage";
+import { ComparePage } from "./features/simulator/ComparePage";
 import { DRILL_PATHS } from "./lib/routes";
 import { HomePage } from "./pages/HomePage";
 import { TablePracticePage } from "./pages/TablePracticePage";
@@ -30,7 +30,7 @@ export const router = createBrowserRouter([
           { path: "generator", element: <StrategyGeneratorPage /> },
           { path: "evaluator", element: <EvaluatorPage /> },
           { path: "runs", element: <RunsPage /> },
-          { path: "compare", element: <SimulatorPlaceholder title="Compare" /> }
+          { path: "compare", element: <ComparePage /> }
         ]
       },
       { path: "*", element: <NotFoundPage /> }

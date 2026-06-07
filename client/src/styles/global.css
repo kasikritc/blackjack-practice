@@ -3901,3 +3901,258 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.sim-compare-page {
+  display: grid;
+  gap: 14px;
+}
+
+.sim-compare-builder,
+.sim-compare-output {
+  padding: 22px;
+}
+
+.sim-compare-builder .sim-section-heading h2 {
+  font-size: 22px;
+}
+
+.sim-workflow-toggle {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sim-workflow-toggle button {
+  padding: 7px 10px;
+  color: var(--muted);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.sim-workflow-toggle button.is-active {
+  color: #221807;
+  background: var(--gold);
+}
+
+.sim-compare-intro {
+  max-width: 760px;
+  margin: -5px 0 18px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.sim-compare-selectors {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+.sim-compare-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.sim-compare-selector > .eyebrow,
+.sim-compare-run-meta {
+  grid-column: 1 / -1;
+}
+
+.sim-compare-selector label {
+  display: grid;
+  gap: 5px;
+}
+
+.sim-compare-selector label > span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.sim-compare-selector select {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  color: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #091310;
+  font-size: 10px;
+}
+
+.sim-compare-versus {
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.sim-compare-run-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.sim-compare-button {
+  display: block;
+  min-width: 180px;
+  margin: 16px auto 0;
+}
+
+.sim-compare-empty {
+  padding: 42px;
+  text-align: center;
+}
+
+.sim-compare-empty p {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sim-compatibility {
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sim-compatibility.is-compatible {
+  color: #a7edbb;
+  background: rgba(103, 213, 138, 0.1);
+}
+
+.sim-compatibility.is-warning {
+  color: #f4cf7a;
+  background: rgba(217, 180, 90, 0.1);
+}
+
+.sim-comparison-warnings {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(217, 180, 90, 0.3);
+  border-radius: 7px;
+  background: rgba(217, 180, 90, 0.06);
+}
+
+.sim-comparison-warnings p {
+  margin: 0;
+  color: #e5cf98;
+  font-size: 9px;
+}
+
+.sim-compare-results {
+  display: grid;
+  gap: 12px;
+}
+
+.sim-compare-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sim-compare-summary > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.13);
+}
+
+.sim-compare-summary span {
+  color: var(--muted);
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.sim-compare-summary strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sim-compare-cell-table,
+.sim-compare-metric-table {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.sim-compare-cell-table > div {
+  display: grid;
+  grid-template-columns: 1.2fr 0.7fr 0.7fr 0.8fr 0.8fr 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 9px;
+  border-bottom: 1px solid var(--line);
+  font-size: 9px;
+}
+
+.sim-compare-cell-table > div.is-changed {
+  background: rgba(217, 180, 90, 0.06);
+}
+
+.sim-compare-cell-table .sim-compare-cell-head,
+.sim-compare-metric-table .sim-compare-metric-head {
+  color: var(--muted);
+  background: #091310;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.sim-compare-cell-table span.action-hit {
+  color: #80bfff;
+}
+.sim-compare-cell-table span.action-stand {
+  color: #8fe5a8;
+}
+.sim-compare-cell-table span.action-double {
+  color: #f1d584;
+}
+.sim-compare-cell-table span.action-split {
+  color: #d2a3ed;
+}
+.sim-compare-cell-table span.action-surrender {
+  color: #ff9b8f;
+}
+
+.sim-compare-metric-table > div {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+}
+
+.sim-compare-metric-table .is-positive {
+  color: var(--good);
+}
+.sim-compare-metric-table .is-negative {
+  color: #ff9186;
+}

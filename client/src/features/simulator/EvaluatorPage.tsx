@@ -158,7 +158,7 @@ export function EvaluatorPage() {
         <section className="simulator-panel sim-builder-intro">
           <div>
             <p className="eyebrow">Aggregate performance analysis</p>
-            <h2>Evaluator</h2>
+            <h2>Performance Evaluator</h2>
             <p>
               Execute one complete strategy over deterministic independent paths to measure EV,
               house edge, variance, hourly return, drawdown, and finite-horizon risk of ruin.

@@ -224,8 +224,8 @@ export function RunsPage() {
             onChange={event => setWorkflow(event.target.value as typeof workflow)}
           >
             <option value="all">All workflows</option>
-            <option value="generator">Generator</option>
-            <option value="evaluator">Evaluator</option>
+            <option value="generator">Strategy Optimizer</option>
+            <option value="evaluator">Performance Evaluator</option>
           </select>
           <select value={status} onChange={event => setStatus(event.target.value)}>
             <option value="all">All statuses</option>

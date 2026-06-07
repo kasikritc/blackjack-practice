@@ -85,8 +85,8 @@ export function SimulatorWorkspace() {
       </header>
 
       <nav className="simulator-nav" aria-label="Simulator sections">
-        <NavLink to="/simulator/generator">Strategy Generator</NavLink>
-        <NavLink to="/simulator/evaluator">Evaluator</NavLink>
+        <NavLink to="/simulator/generator">Strategy Optimizer</NavLink>
+        <NavLink to="/simulator/evaluator">Performance Evaluator</NavLink>
         <NavLink to="/simulator/runs">Runs</NavLink>
         <NavLink to="/simulator/compare">Compare</NavLink>
       </nav>

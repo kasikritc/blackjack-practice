@@ -115,7 +115,7 @@ export function StrategyGeneratorPage() {
         <section className="simulator-panel sim-builder-intro">
           <div>
             <p className="eyebrow">Decision optimization</p>
-            <h2>Strategy Generator</h2>
+            <h2>Strategy Optimizer</h2>
             <p>
               Search every hard, soft, and pair cell with paired Monte Carlo rollouts, frozen-policy
               iterations, and explicit confidence gates.
@@ -308,7 +308,7 @@ export function StrategyGeneratorPage() {
       <aside className="sim-builder-sidebar">
         <section className="simulator-panel sim-launch-card">
           <p className="eyebrow">Preflight</p>
-          <h3>Queue generator run</h3>
+          <h3>Queue optimization run</h3>
           <dl>
             <div>
               <dt>Preset</dt>

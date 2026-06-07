@@ -240,13 +240,13 @@ export function ComparePage() {
               className={workflow === "generator" ? "is-active" : ""}
               onClick={() => setWorkflow("generator")}
             >
-              Strategy Generator
+              Strategy Optimizer
             </button>
             <button
               className={workflow === "evaluator" ? "is-active" : ""}
               onClick={() => setWorkflow("evaluator")}
             >
-              Evaluator
+              Performance Evaluator
             </button>
           </div>
         </div>

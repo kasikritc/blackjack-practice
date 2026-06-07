@@ -8,7 +8,8 @@ import type {
 } from "@blackjack/shared";
 import { useNavigate } from "react-router-dom";
 import { simulatorApi } from "./api";
-import { ArrayField, Field, NumberField, formatBytes, formatCompactNumber } from "./FormControls";
+import { ArrayField, Field, NumberField } from "./FormControls";
+import { formatBytes, formatCompactNumber } from "./format";
 import { RulesEditor } from "./RulesEditor";
 
 function cloneConfig(config: StrategySimulationConfig): StrategySimulationConfig {

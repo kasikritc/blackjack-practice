@@ -1,5 +1,6 @@
 import type {
   EvaluatorAggregateAnalysis,
+  EvaluatorRawRecordsResponse,
   GeneratorEvidenceResponse,
   SimulatorComparison,
   SimulatorComparisonRequest,
@@ -51,6 +52,14 @@ export const simulatorApi = {
       "GET",
       `/runs/${encodeURIComponent(id)}/evaluator-analysis`
     ),
+  evaluatorRawRecords: (id: string, file?: string, offset = 0, limit = 100) => {
+    const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+    if (file) query.set("file", file);
+    return request<EvaluatorRawRecordsResponse>(
+      "GET",
+      `/runs/${encodeURIComponent(id)}/evaluator-raw?${query.toString()}`
+    );
+  },
   regenerateSummary: (id: string) =>
     request<SimulatorRunDetail>("POST", `/runs/${encodeURIComponent(id)}/summarize`),
   validate: (payload: SimulatorRunRequest) =>

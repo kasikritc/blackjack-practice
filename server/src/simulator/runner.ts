@@ -3,11 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { zstdDecompressSync } from "node:zlib";
+import { createZstdDecompress, zstdDecompressSync } from "node:zlib";
 import { randomUUID } from "node:crypto";
 import type {
   EvaluatorAggregateAnalysis,
   EvaluatorProgress,
+  EvaluatorRawRecord,
+  EvaluatorRawRecordsResponse,
   GeneratorCompositionEvidence,
   GeneratorCountStratum,
   GeneratorEvidenceResponse,
@@ -444,6 +446,58 @@ export class SimulatorRunner {
     );
     if (!analysis) throw new Error("Evaluator aggregate analysis is not available.");
     return analysis;
+  }
+
+  async evaluatorRawRecords(
+    id: string,
+    requestedFile?: string,
+    requestedOffset = 0,
+    requestedLimit = 100
+  ): Promise<EvaluatorRawRecordsResponse> {
+    const run = this.store.detail(id);
+    if (!run?.outputDirectory || run.workflow !== "evaluator")
+      throw new Error("Evaluator raw records are not available.");
+    const rawDirectory = path.join(run.outputDirectory, "raw");
+    const files = fs.existsSync(rawDirectory)
+      ? fs
+          .readdirSync(rawDirectory)
+          .filter(file => file.endsWith(".jsonl.zst"))
+          .sort((left, right) => {
+            const leftPath = Number(left.match(/\d+/)?.[0] || 0);
+            const rightPath = Number(right.match(/\d+/)?.[0] || 0);
+            return leftPath - rightPath;
+          })
+      : [];
+    const selectedFile = requestedFile || files[0];
+    if (!selectedFile) return { files, offset: 0, limit: 0, hasMore: false, records: [] };
+    if (!files.includes(selectedFile)) throw new Error("Raw record file not found.");
+    const offset = Math.max(0, Math.floor(requestedOffset));
+    const limit = Math.min(500, Math.max(1, Math.floor(requestedLimit)));
+    const records: EvaluatorRawRecord[] = [];
+    let lineIndex = 0;
+    let hasMore = false;
+    const input = fs.createReadStream(path.join(rawDirectory, selectedFile));
+    const decompressor = createZstdDecompress();
+    const lines = readline.createInterface({
+      input: input.pipe(decompressor),
+      crlfDelay: Infinity
+    });
+    try {
+      for await (const line of lines) {
+        if (!line.trim()) continue;
+        if (lineIndex++ < offset) continue;
+        if (records.length >= limit) {
+          hasMore = true;
+          break;
+        }
+        records.push(JSON.parse(line) as EvaluatorRawRecord);
+      }
+    } finally {
+      lines.close();
+      input.destroy();
+      decompressor.destroy();
+    }
+    return { files, selectedFile, offset, limit, hasMore, records };
   }
 
   regenerateEvaluatorSummary(id: string): SimulatorRunDetail {

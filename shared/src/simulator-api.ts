@@ -204,6 +204,47 @@ export interface EvaluatorAggregateAnalysis {
   maxDrawdownUnits: number;
 }
 
+export interface EvaluatorRawRecord {
+  recordVersion: number;
+  path: number;
+  round: number;
+  shoe: number;
+  trueCount: number;
+  depthPercent: number;
+  runningCountBefore: number;
+  runningCountAfter: number;
+  cardsRemainingBefore: number;
+  cardsRemainingAfter: number;
+  cardsConsumed: number;
+  wager: number;
+  initialWager?: number;
+  exposure?: number;
+  profit: number;
+  hands?: number;
+  wins?: number;
+  losses?: number;
+  pushes?: number;
+  busts?: number;
+  doubles?: number;
+  surrenders?: number;
+  splits?: number;
+  playerBlackjack?: boolean;
+  dealerBlackjack?: boolean;
+  insuranceTaken?: boolean;
+  insuranceProfit?: number;
+  evenMoneyTaken?: boolean;
+  observed: boolean;
+}
+
+export interface EvaluatorRawRecordsResponse {
+  files: string[];
+  selectedFile?: string;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+  records: EvaluatorRawRecord[];
+}
+
 export interface SimulatorRunDetail extends SimulatorRunListItem {
   config: StrategySimulationConfig | StrategyEvaluationRunConfig;
   strategy?: StrategyEvaluationPackage;

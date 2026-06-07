@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
-import type { EvaluatorAggregateAnalysis, GeneratorEvidenceResponse } from "@blackjack/shared";
+import type {
+  EvaluatorAggregateAnalysis,
+  EvaluatorAggregateStats,
+  EvaluatorRawRecordsResponse,
+  GeneratorEvidenceResponse
+} from "@blackjack/shared";
 import { simulatorApi } from "./api";
 import { formatCompactNumber } from "./format";
 
@@ -229,11 +234,48 @@ function cubeParts(key: string) {
   return { trueCount: values.tc, depth: values.depth, wager: values.wager };
 }
 
+function AggregateStats({ stats }: { stats: EvaluatorAggregateStats }) {
+  const values = [
+    ["Rounds", stats.rounds],
+    ["Wagered rounds", stats.wageredRounds],
+    ["Profit", stats.profit.toFixed(3)],
+    ["Initial wagers", stats.initialWagers.toFixed(2)],
+    ["Exposure", stats.exposure.toFixed(2)],
+    ["Wins", stats.wins],
+    ["Losses", stats.losses],
+    ["Pushes", stats.pushes],
+    ["Blackjacks", stats.blackjacks],
+    ["Dealer blackjacks", stats.dealerBlackjacks],
+    ["Busts", stats.busts],
+    ["Surrenders", stats.surrenders],
+    ["Doubles", stats.doubles],
+    ["Splits", stats.splits],
+    ["Insurance", stats.insuranceTaken],
+    ["Even money", stats.evenMoneyTaken]
+  ];
+  return (
+    <div className="sim-detail-grid sim-stat-grid">
+      {values.map(([label, value]) => (
+        <div key={label}>
+          <span>{label}</span>
+          <strong>{typeof value === "number" ? value.toLocaleString() : value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function EvaluatorAnalysisPanel({ runId }: { runId: string }) {
   const [analysis, setAnalysis] = useState<EvaluatorAggregateAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [view, setView] = useState<"paths" | "cubes" | "raw">("paths");
   const [query, setQuery] = useState("");
+  const [selectedPath, setSelectedPath] = useState(0);
+  const [selectedCube, setSelectedCube] = useState("");
+  const [raw, setRaw] = useState<EvaluatorRawRecordsResponse | null>(null);
+  const [rawLoading, setRawLoading] = useState(false);
+  const [rawError, setRawError] = useState("");
 
   const load = () => {
     if (analysis || loading) return;
@@ -246,109 +288,246 @@ export function EvaluatorAnalysisPanel({ runId }: { runId: string }) {
       )
       .finally(() => setLoading(false));
   };
-
+  const loadRaw = (file?: string, offset = 0) => {
+    setRawLoading(true);
+    setRawError("");
+    simulatorApi
+      .evaluatorRawRecords(runId, file, offset, 100)
+      .then(setRaw)
+      .catch(reason =>
+        setRawError(reason instanceof Error ? reason.message : "Could not load retained rounds.")
+      )
+      .finally(() => setRawLoading(false));
+  };
   const cubes = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return [...(analysis?.cubes || [])]
       .filter(cube => !normalized || cube.key.toLowerCase().includes(normalized))
       .sort((left, right) => right.stats.rounds - left.stats.rounds);
   }, [analysis, query]);
-
   const pathMin = Math.min(...(analysis?.pathEvs || [0]));
   const pathMax = Math.max(...(analysis?.pathEvs || [0]));
   const pathRange = Math.max(pathMax - pathMin, 0.000001);
+  const path = analysis?.paths.find(item => item.path === selectedPath) || analysis?.paths[0];
+  const cube = analysis?.cubes.find(item => item.key === selectedCube) || cubes[0];
 
   return (
     <details
       className="sim-evidence-explorer"
       onToggle={event => event.currentTarget.open && load()}
     >
-      <summary>Path distribution and count/depth/wager cubes</summary>
+      <summary>Advanced evaluator evidence</summary>
       <p>
-        Drill into independent-path EV dispersion and the complete aggregate cube used for count,
-        shoe-depth, and wager analysis.
+        Inspect deterministic path outcomes, complete count/depth/wager sufficient statistics, and
+        retained round records without leaving the workstation.
       </p>
       <EvidenceState loading={loading} error={error} />
       {analysis ? (
         <div className="sim-analysis-stack">
-          <section className="sim-subpanel">
-            <div className="sim-subpanel-heading">
-              <h4>Independent path EVs</h4>
-              <span>{analysis.paths.length} deterministic paths</span>
-            </div>
-            <div className="sim-path-distribution">
-              {analysis.pathEvs.map((value, index) => (
-                <div key={index} title={"Path " + index + ": " + percent(value)}>
-                  <i style={{ height: 12 + ((value - pathMin) / pathRange) * 76 + "%" }} />
-                  <span>{index}</span>
+          <div className="sim-evidence-tabs">
+            <button
+              className={view === "paths" ? "is-active" : ""}
+              onClick={() => setView("paths")}
+            >
+              Paths ({analysis.paths.length})
+            </button>
+            <button
+              className={view === "cubes" ? "is-active" : ""}
+              onClick={() => setView("cubes")}
+            >
+              Cubes ({analysis.cubes.length.toLocaleString()})
+            </button>
+            <button
+              className={view === "raw" ? "is-active" : ""}
+              onClick={() => {
+                setView("raw");
+                if (!raw && !rawLoading) loadRaw();
+              }}
+            >
+              Retained rounds
+            </button>
+          </div>
+          {view === "paths" ? (
+            <section className="sim-subpanel">
+              <div className="sim-subpanel-heading">
+                <h4>Independent path EVs</h4>
+                <span>{analysis.paths.length} deterministic paths</span>
+              </div>
+              <div className="sim-path-distribution">
+                {analysis.pathEvs.map((value, index) => (
+                  <button
+                    type="button"
+                    className={selectedPath === index ? "is-selected" : ""}
+                    key={index}
+                    title={"Path " + index + ": " + percent(value)}
+                    onClick={() => setSelectedPath(index)}
+                  >
+                    <i style={{ height: 12 + ((value - pathMin) / pathRange) * 76 + "%" }} />
+                    <span>{index}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="sim-detail-grid">
+                <div>
+                  <span>Minimum path EV</span>
+                  <strong>{percent(pathMin)}</strong>
                 </div>
-              ))}
-            </div>
-            <div className="sim-detail-grid">
-              <div>
-                <span>Minimum path EV</span>
-                <strong>{percent(pathMin)}</strong>
+                <div>
+                  <span>Maximum path EV</span>
+                  <strong>{percent(pathMax)}</strong>
+                </div>
+                <div>
+                  <span>Evaluator version</span>
+                  <strong>{analysis.evaluatorVersion}</strong>
+                </div>
+                <div>
+                  <span>Selected drawdown</span>
+                  <strong>{path?.maxDrawdown.toFixed(3) || "0.000"}</strong>
+                </div>
               </div>
-              <div>
-                <span>Maximum path EV</span>
-                <strong>{percent(pathMax)}</strong>
+              {path ? <AggregateStats stats={path.stats} /> : null}
+            </section>
+          ) : null}
+          {view === "cubes" ? (
+            <section className="sim-subpanel">
+              <div className="sim-subpanel-heading">
+                <h4>Count / depth / wager explorer</h4>
+                <span>Sorted by observed rounds</span>
               </div>
-              <div>
-                <span>Evaluator version</span>
-                <strong>{analysis.evaluatorVersion}</strong>
+              <div className="sim-evidence-filters">
+                <input
+                  placeholder="Filter tc=, depth=, or wager="
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                />
               </div>
-              <div>
-                <span>Aggregate cubes</span>
-                <strong>{analysis.cubes.length.toLocaleString()}</strong>
+              <div className="sim-data-table">
+                <div className="sim-data-head sim-cube-row">
+                  <span>TC</span>
+                  <span>Depth %</span>
+                  <span>Wager</span>
+                  <span>Rounds</span>
+                  <span>Profit</span>
+                  <span>Player EV</span>
+                  <span>Exposure</span>
+                </div>
+                {cubes.slice(0, 250).map(item => {
+                  const parts = cubeParts(item.key);
+                  const ev = item.stats.initialWagers
+                    ? item.stats.profit / item.stats.initialWagers
+                    : 0;
+                  return (
+                    <button
+                      type="button"
+                      className={
+                        "sim-cube-row sim-data-button" +
+                        (cube?.key === item.key ? " is-selected" : "")
+                      }
+                      key={item.key}
+                      onClick={() => setSelectedCube(item.key)}
+                    >
+                      <strong>{parts.trueCount}</strong>
+                      <span>{parts.depth}</span>
+                      <span>{parts.wager}</span>
+                      <span>{item.stats.rounds.toLocaleString()}</span>
+                      <span>{item.stats.profit.toFixed(2)}</span>
+                      <span>{percent(ev)}</span>
+                      <span>{item.stats.exposure.toFixed(2)}</span>
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-          </section>
-          <section className="sim-subpanel">
-            <div className="sim-subpanel-heading">
-              <h4>Count / depth / wager explorer</h4>
-              <span>Sorted by observed rounds</span>
-            </div>
-            <div className="sim-evidence-filters">
-              <input
-                placeholder="Filter tc=, depth=, or wager="
-                value={query}
-                onChange={event => setQuery(event.target.value)}
-              />
-            </div>
-            <div className="sim-data-table">
-              <div className="sim-data-head sim-cube-row">
-                <span>TC</span>
-                <span>Depth %</span>
-                <span>Wager</span>
-                <span>Rounds</span>
-                <span>Profit</span>
-                <span>Player EV</span>
-                <span>Exposure</span>
+              {cube ? <AggregateStats stats={cube.stats} /> : null}
+              {cubes.length > 250 ? (
+                <p className="sim-table-cap">
+                  Showing the 250 largest matching cubes. Refine the filter for a narrower view.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+          {view === "raw" ? (
+            <section className="sim-subpanel">
+              <div className="sim-subpanel-heading">
+                <h4>Retained round records</h4>
+                <span>Streaming pages from compressed JSONL</span>
               </div>
-              {cubes.slice(0, 250).map(cube => {
-                const parts = cubeParts(cube.key);
-                const ev = cube.stats.initialWagers
-                  ? cube.stats.profit / cube.stats.initialWagers
-                  : 0;
-                return (
-                  <div className="sim-cube-row" key={cube.key}>
-                    <strong>{parts.trueCount}</strong>
-                    <span>{parts.depth}</span>
-                    <span>{parts.wager}</span>
-                    <span>{cube.stats.rounds.toLocaleString()}</span>
-                    <span>{cube.stats.profit.toFixed(2)}</span>
-                    <span>{percent(ev)}</span>
-                    <span>{cube.stats.exposure.toFixed(2)}</span>
+              <EvidenceState loading={rawLoading} error={rawError} />
+              {raw ? (
+                <>
+                  <div className="sim-evidence-filters">
+                    <select
+                      value={raw.selectedFile || ""}
+                      onChange={event => loadRaw(event.target.value, 0)}
+                    >
+                      {raw.files.map(file => (
+                        <option key={file}>{file}</option>
+                      ))}
+                    </select>
+                    <span>
+                      {raw.records.length
+                        ? raw.offset + 1 + "-" + (raw.offset + raw.records.length)
+                        : "No retained records"}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-            {cubes.length > 250 ? (
-              <p className="sim-table-cap">
-                Showing the 250 largest matching cubes. Refine the filter for a narrower view.
-              </p>
-            ) : null}
-          </section>
+                  <div className="sim-data-table sim-raw-table">
+                    <div className="sim-data-head sim-raw-row">
+                      <span>Round</span>
+                      <span>Shoe</span>
+                      <span>TC / depth</span>
+                      <span>Count</span>
+                      <span>Wager / exposure</span>
+                      <span>Profit</span>
+                      <span>Outcome</span>
+                    </div>
+                    {raw.records.map(record => (
+                      <div className="sim-raw-row" key={record.path + ":" + record.round}>
+                        <strong>{record.round.toLocaleString()}</strong>
+                        <span>{record.shoe}</span>
+                        <span>
+                          {record.trueCount} / {record.depthPercent}%
+                        </span>
+                        <span>
+                          {record.runningCountBefore} → {record.runningCountAfter}
+                        </span>
+                        <span>
+                          {record.wager.toFixed(2)} / {(record.exposure || 0).toFixed(2)}
+                        </span>
+                        <span className={record.profit >= 0 ? "is-positive" : "is-negative"}>
+                          {record.profit.toFixed(2)}
+                        </span>
+                        <span>
+                          {record.observed
+                            ? "Observed"
+                            : "W" +
+                              (record.wins || 0) +
+                              " L" +
+                              (record.losses || 0) +
+                              " P" +
+                              (record.pushes || 0)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="sim-page-actions">
+                    <button
+                      className="ghost-button"
+                      disabled={raw.offset === 0 || rawLoading}
+                      onClick={() => loadRaw(raw.selectedFile, Math.max(0, raw.offset - raw.limit))}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={!raw.hasMore || rawLoading}
+                      onClick={() => loadRaw(raw.selectedFile, raw.offset + raw.limit)}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </section>
+          ) : null}
         </div>
       ) : null}
     </details>

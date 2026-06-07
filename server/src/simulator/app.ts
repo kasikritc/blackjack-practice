@@ -262,6 +262,20 @@ export function createSimulatorApp(runner = new SimulatorRunner()) {
   app.get("/sim-api/runs/:id/evaluator-analysis", (req, res) =>
     res.json(runner.evaluatorAnalysis(req.params.id))
   );
+  app.get("/sim-api/runs/:id/evaluator-raw", async (req, res, next) => {
+    try {
+      res.json(
+        await runner.evaluatorRawRecords(
+          req.params.id,
+          typeof req.query.file === "string" ? req.query.file : undefined,
+          Number(req.query.offset || 0),
+          Number(req.query.limit || 100)
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  });
   app.post("/sim-api/runs/:id/summarize", (req, res) =>
     res.json(runner.regenerateEvaluatorSummary(req.params.id))
   );

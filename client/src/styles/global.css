@@ -3740,6 +3740,68 @@ button:disabled {
   font-size: 8px;
 }
 
+.sim-stat-grid {
+  margin-top: 10px;
+}
+
+.sim-path-distribution button {
+  display: grid;
+  grid-template-rows: 90px auto;
+  align-items: end;
+  min-width: 16px;
+  padding: 0;
+  color: var(--muted);
+  border: 0;
+  background: transparent;
+}
+
+.sim-path-distribution button.is-selected i,
+.sim-path-distribution button:hover i {
+  background: var(--gold);
+}
+
+.sim-data-button {
+  width: 100%;
+  color: inherit;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+}
+
+.sim-data-button.is-selected,
+.sim-data-button:hover {
+  background: rgba(217, 180, 90, 0.08);
+}
+
+.sim-raw-table {
+  overflow-x: auto;
+}
+
+.sim-raw-row {
+  display: grid;
+  grid-template-columns: 0.7fr 0.5fr 0.8fr 1fr 1fr 0.65fr 1fr;
+  gap: 8px;
+  min-width: 760px;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 9px;
+}
+
+.sim-raw-row .is-positive {
+  color: var(--good);
+}
+
+.sim-raw-row .is-negative {
+  color: #ff9186;
+}
+
+.sim-page-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
 .sim-empty-list,
 .sim-empty-detail {
   padding: 24px;

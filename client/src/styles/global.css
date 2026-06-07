@@ -2722,3 +2722,285 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.sim-source-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.sim-file-button {
+  position: relative;
+  overflow: hidden;
+  min-height: 38px;
+  font-size: 11px;
+}
+
+.sim-file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.sim-source-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.sim-source-summary div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.sim-source-summary span {
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sim-source-summary strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sim-guided-note {
+  margin: 14px 0 0;
+  padding: 11px 13px;
+  color: var(--muted);
+  border-left: 2px solid rgba(217, 180, 90, 0.45);
+  background: rgba(217, 180, 90, 0.05);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.sim-package-editor {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.sim-editor-details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.13);
+}
+
+.sim-editor-details > summary {
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #e1ebe6;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.sim-editor-details[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.sim-editor-details > .sim-rules-editor,
+.sim-editor-details > .sim-package-chart-stack,
+.sim-editor-details > .sim-deviation-list,
+.sim-editor-details > .sim-ramp-grid,
+.sim-editor-details > p,
+.sim-editor-details > .sim-add-row {
+  margin: 14px;
+}
+
+.sim-editor-details > p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.sim-package-chart-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.sim-package-chart {
+  display: grid;
+  gap: 8px;
+}
+
+.sim-package-chart h4,
+.sim-policy-heading h4 {
+  font-size: 12px;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sim-package-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.sim-package-table-wrap table {
+  width: 100%;
+  min-width: 890px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.sim-package-table-wrap th,
+.sim-package-table-wrap td {
+  padding: 3px;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  text-align: center;
+  font-size: 9px;
+}
+
+.sim-package-table-wrap th {
+  color: var(--muted);
+  background: #0a1512;
+}
+
+.sim-package-table-wrap select {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 2px;
+  color: var(--paper);
+  border: 0;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 9px;
+}
+
+.sim-package-table-wrap .sim-fallback-select {
+  margin-top: 2px;
+  color: #d6d1be;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 8px;
+}
+
+.sim-package-table-wrap td.action-hit {
+  background: rgba(54, 126, 206, 0.22);
+}
+.sim-package-table-wrap td.action-stand {
+  background: rgba(103, 213, 138, 0.18);
+}
+.sim-package-table-wrap td.action-double {
+  background: rgba(217, 180, 90, 0.2);
+}
+.sim-package-table-wrap td.action-split {
+  background: rgba(178, 104, 217, 0.2);
+}
+.sim-package-table-wrap td.action-surrender {
+  background: rgba(228, 95, 95, 0.2);
+}
+
+.sim-deviation-list,
+.sim-inline-table,
+.sim-ramp-grid {
+  display: grid;
+  gap: 7px;
+}
+
+.sim-deviation-row {
+  display: grid;
+  grid-template-columns: 0.7fr 0.7fr 0.55fr 1fr 0.55fr 0.8fr 0.8fr auto;
+  gap: 6px;
+}
+
+.sim-deviation-row input,
+.sim-deviation-row select,
+.sim-inline-row input,
+.sim-inline-row select {
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 7px;
+  color: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #091310;
+  font-size: 10px;
+}
+
+.sim-row-remove,
+.sim-add-row {
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid rgba(228, 95, 95, 0.28);
+  border-radius: 5px;
+  color: #ffaaa0;
+  background: rgba(228, 95, 95, 0.08);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.sim-add-row {
+  justify-self: start;
+  border-color: rgba(217, 180, 90, 0.3);
+  color: var(--gold);
+  background: rgba(217, 180, 90, 0.07);
+}
+
+.sim-side-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sim-policy-editor {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.13);
+}
+
+.sim-policy-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sim-policy-heading .sim-field {
+  width: 130px;
+}
+
+.sim-inline-row {
+  display: grid;
+  grid-template-columns: 1fr 0.65fr 0.75fr auto;
+  gap: 6px;
+}
+
+.sim-ramp-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.sim-ramp-step {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.sim-ramp-step .sim-row-remove {
+  grid-column: 1 / -1;
+}
+
+.sim-retention-warning {
+  max-width: 430px;
+  margin-top: 12px;
+}

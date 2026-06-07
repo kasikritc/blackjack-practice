@@ -9,6 +9,7 @@ import type {
   SimulatorEvent,
   SimulatorRunRequest,
   SimulatorStrategySource,
+  StrategyChartImportPackage,
   StrategyEvaluationPackage,
   StrategyEvaluationSummary,
   StrategySimulationCellResult,
@@ -246,10 +247,20 @@ export function createSimulatorApp(runner = new SimulatorRunner()) {
       for (const artifact of detail.artifacts.filter(item =>
         item.relativePath.endsWith(".import-package.json")
       )) {
-        const packageBody = jsonFile<StrategyEvaluationPackage>(
+        const generated = jsonFile<StrategyChartImportPackage>(
           path.join(detail.outputDirectory, artifact.relativePath)
         );
-        if (!packageBody) continue;
+        if (!generated) continue;
+        const packageBody = makeStrategyEvaluationPackage({
+          chartId: 0,
+          name: generated.name,
+          rules: generated.rules,
+          chart: generated.chart
+        });
+        packageBody.id = `generated-${run.id}-${path.basename(
+          artifact.relativePath,
+          ".import-package.json"
+        )}`;
         sources.push({
           id: `generated:${run.id}:${artifact.relativePath}`,
           kind: "generated-bucket",

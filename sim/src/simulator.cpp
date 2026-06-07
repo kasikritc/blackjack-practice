@@ -45,9 +45,9 @@ struct RunningStats {
     ++samples;
     sum += outcome.profit;
     sum_sq += outcome.profit * outcome.profit;
-    wins += outcome.wins > outcome.losses ? 1 : 0;
-    losses += outcome.losses > outcome.wins ? 1 : 0;
-    pushes += outcome.wins == outcome.losses ? 1 : 0;
+    wins += outcome.profit > 0 ? 1 : 0;
+    losses += outcome.profit < 0 ? 1 : 0;
+    pushes += outcome.profit == 0 ? 1 : 0;
     blackjacks += outcome.player_blackjack ? 1 : 0;
     busts += outcome.busts > 0 ? 1 : 0;
     surrenders += outcome.surrenders > 0 ? 1 : 0;
@@ -90,6 +90,7 @@ struct ActionResult {
   Action action = Action::Stand;
   RunningStats stats;
   std::map<std::string, RunningStats> compositions;
+  std::map<int, RunningStats> running_counts;
 };
 
 struct CellResult {
@@ -398,6 +399,7 @@ CellResult simulate_cell(const Config& config, const std::string& category,
         profits[ai] = outcome.profit;
         cell.actions[ai].stats.add(outcome);
         cell.actions[ai].compositions[composition.key].add(outcome);
+        cell.actions[ai].running_counts[shoe_sample.running_count].add(outcome);
       }
       for (size_t i = 0; i < actions.size(); ++i)
         for (size_t j = 0; j < actions.size(); ++j)
@@ -533,9 +535,18 @@ void write_artifacts(const Config& config, const std::vector<CellResult>& cells,
 
   json summary = {{"manifest", manifest}, {"charts", json::object()}, {"cells", json::array()}};
   json composition = json::array();
+  json count_strata = json::array();
   for (const auto& cell : cells) {
     summary["cells"].push_back(cell_json(cell, config.confidence_z));
     for (const auto& action : cell.actions) {
+      for (const auto& [running_count, stats] : action.running_counts) {
+        count_strata.push_back({{"category", cell.category}, {"rowKey", cell.row_key},
+          {"dealerUpcard", cell.dealer}, {"decksRemaining", cell.decks_remaining},
+          {"runningCount", running_count},
+          {"exactTrueCount", running_count / cell.decks_remaining},
+          {"action", action_name(action.action)}, {"samples", stats.samples},
+          {"ev", stats.mean()}, {"standardError", stats.standard_error()}});
+      }
       for (const auto& [key, stats] : action.compositions) {
         composition.push_back({{"category", cell.category}, {"rowKey", cell.row_key},
           {"dealerUpcard", cell.dealer}, {"trueCount", cell.true_count},
@@ -575,6 +586,7 @@ void write_artifacts(const Config& config, const std::vector<CellResult>& cells,
   }
   std::ofstream(run_dir / "simulation-summary.json") << std::setw(2) << summary << '\n';
   std::ofstream(run_dir / "composition-results.json") << std::setw(2) << composition << '\n';
+  std::ofstream(run_dir / "count-strata-results.json") << std::setw(2) << count_strata << '\n';
 
   json insurance = json::array();
   if (config.rules.insurance) {

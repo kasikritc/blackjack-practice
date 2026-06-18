@@ -128,6 +128,7 @@ export interface DeckCountdownRoundSubmittedRequest {
 }
 
 export interface StrategyAttemptRequest {
+  sessionId?: number;
   ruleProfileId?: number;
   chartId?: number;
   subsetId?: number;
@@ -254,6 +255,43 @@ export interface FlashSummary {
   noMajorErrorStreak: number;
   errorBuckets: ErrorBuckets;
   byCardCount: MetricGroup[];
+}
+
+export interface StrategyAnalyticsMetric {
+  key: string;
+  label: string;
+  attempts: number;
+  correct: number;
+  accuracy: number;
+  medianResponse: number;
+  category?: string;
+  rowKey?: string;
+  dealerUpcard?: string;
+}
+
+export interface StrategyAnalyticsSummary {
+  totals: {
+    attempts: number;
+    correct: number;
+    accuracy: number;
+    medianResponse: number;
+  };
+  cells: StrategyAnalyticsMetric[];
+  categories: StrategyAnalyticsMetric[];
+  rows: StrategyAnalyticsMetric[];
+  dealerUpcards: StrategyAnalyticsMetric[];
+  strengths: {
+    cells: StrategyAnalyticsMetric[];
+    categories: StrategyAnalyticsMetric[];
+    rows: StrategyAnalyticsMetric[];
+    dealerUpcards: StrategyAnalyticsMetric[];
+  };
+  weaknesses: {
+    cells: StrategyAnalyticsMetric[];
+    categories: StrategyAnalyticsMetric[];
+    rows: StrategyAnalyticsMetric[];
+    dealerUpcards: StrategyAnalyticsMetric[];
+  };
 }
 
 export interface DeckCountdownSummary {

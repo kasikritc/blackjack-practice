@@ -11,6 +11,7 @@ import {
   buildDeckCountdownTrends,
   deckCountdownRecentSessions
 } from "../services/deckCountdownAnalytics.service.js";
+import { buildStrategySummary } from "../services/strategyAnalytics.service.js";
 import { clampInt, rangeToSinceIso } from "../util.js";
 
 export const analyticsRouter = Router();
@@ -77,5 +78,14 @@ analyticsRouter.get("/analytics/deck-countdown-sessions", (req, res) => {
 
 analyticsRouter.delete("/analytics/deck-countdown", (_req, res) => {
   runSql("DELETE FROM deck_countdown_rounds;");
+  res.status(200).json({ ok: true });
+});
+
+analyticsRouter.get("/analytics/strategy-summary", (_req, res) => {
+  res.status(200).json(buildStrategySummary());
+});
+
+analyticsRouter.delete("/analytics/strategy", (_req, res) => {
+  runSql("DELETE FROM strategy_attempts;");
   res.status(200).json({ ok: true });
 });

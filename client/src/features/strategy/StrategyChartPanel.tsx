@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import type { StrategyAnalyticsMetric, StrategyAnalyticsSummary, StrategyData } from "@blackjack/shared";
+import type {
+  StrategyAnalyticsMetric,
+  StrategyAnalyticsSummary,
+  StrategyData
+} from "@blackjack/shared";
 import { Drawer } from "../../components/Drawer";
 import { api } from "../../lib/api";
 import { formatMs, formatPercent } from "../../lib/format";
@@ -201,7 +205,9 @@ export function StrategyChartPanel({
   const clearHighlights = () => onCriteriaChange(defaultStrategyCriteria());
 
   const resetAnalytics = async () => {
-    if (!window.confirm("Reset only Basic Strategy analytics? Other drill analytics stay intact.")) {
+    if (
+      !window.confirm("Reset only Basic Strategy analytics? Other drill analytics stay intact.")
+    ) {
       return;
     }
     try {
@@ -289,10 +295,9 @@ export function StrategyChartPanel({
     const cls = analyticsMode
       ? "strategy-cell is-analytics-cell"
       : `strategy-cell${action ? ` action-${action}` : ""}${included ? " is-included" : " is-excluded"}${chartView === "fallback" && editableFallback ? " is-fallback-needed" : ""}${chartView === "fallback" && !editableFallback ? " is-fallback-disabled" : ""}`;
-    const title =
-      analyticsMode
-        ? `${metric?.label ?? "No attempts"}: ${metric ? `${formatPercent(metric.accuracy)}%` : "no data"}`
-        : chartView === "fallback"
+    const title = analyticsMode
+      ? `${metric?.label ?? "No attempts"}: ${metric ? `${formatPercent(metric.accuracy)}%` : "no data"}`
+      : chartView === "fallback"
         ? editableFallback
           ? `${(action && STRATEGY_ACTION_LABELS[action]) || "Unset"} fallback for ${STRATEGY_ACTION_LABELS[primaryAction || ""] || primaryAction}`
           : "No after-hit fallback needed for this cell"
@@ -447,7 +452,11 @@ export function StrategyChartPanel({
             After hit fallback
           </button>
           {mode === "review" ? (
-            <button type="button" className={analyticsMode ? "is-active" : ""} onClick={() => setAnalyticsMode(true)}>
+            <button
+              type="button"
+              className={analyticsMode ? "is-active" : ""}
+              onClick={() => setAnalyticsMode(true)}
+            >
               Analytics
             </button>
           ) : null}
@@ -665,15 +674,24 @@ function StrategyAnalyticsTools({
 }) {
   const totals = analytics?.totals;
   return (
-    <section className="strategy-chart-tools strategy-analytics-tools" aria-label="Strategy analytics tools">
+    <section
+      className="strategy-chart-tools strategy-analytics-tools"
+      aria-label="Strategy analytics tools"
+    >
       <div className="strategy-analytics-total">
         <span>Overall accuracy</span>
         <strong>{totals?.attempts ? `${formatPercent(totals.accuracy)}%` : "—"}</strong>
         <small>
-          {totals?.correct ?? 0} / {totals?.attempts ?? 0} decisions · median {formatMs(totals?.medianResponse ?? 0)}
+          {totals?.correct ?? 0} / {totals?.attempts ?? 0} decisions · median{" "}
+          {formatMs(totals?.medianResponse ?? 0)}
         </small>
       </div>
-      <p>{error || (loading ? "Loading analytics…" : "Cell, row, column, and category accuracy use all tracked Basic Strategy decisions.")}</p>
+      <p>
+        {error ||
+          (loading
+            ? "Loading analytics…"
+            : "Cell, row, column, and category accuracy use all tracked Basic Strategy decisions.")}
+      </p>
       <button type="button" className="ghost-button" onClick={onRefresh} disabled={loading}>
         Refresh
       </button>

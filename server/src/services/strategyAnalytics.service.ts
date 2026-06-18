@@ -64,13 +64,17 @@ function groupMetric(
 
 function topStrengths(metrics: StrategyAnalyticsMetric[]): StrategyAnalyticsMetric[] {
   return [...metrics]
-    .sort((a, b) => b.accuracy - a.accuracy || b.attempts - a.attempts || a.label.localeCompare(b.label))
+    .sort(
+      (a, b) => b.accuracy - a.accuracy || b.attempts - a.attempts || a.label.localeCompare(b.label)
+    )
     .slice(0, 3);
 }
 
 function topWeaknesses(metrics: StrategyAnalyticsMetric[]): StrategyAnalyticsMetric[] {
   return [...metrics]
-    .sort((a, b) => a.accuracy - b.accuracy || b.attempts - a.attempts || a.label.localeCompare(b.label))
+    .sort(
+      (a, b) => a.accuracy - b.accuracy || b.attempts - a.attempts || a.label.localeCompare(b.label)
+    )
     .slice(0, 3);
 }
 

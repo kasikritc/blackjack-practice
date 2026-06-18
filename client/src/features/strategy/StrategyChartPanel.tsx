@@ -30,8 +30,8 @@ import {
 
 interface Props {
   open: boolean;
-  mode: "review" | "edit";
-  setMode: (mode: "review" | "edit") => void;
+  mode: StrategyPanelMode;
+  setMode: (mode: StrategyPanelMode) => void;
   onClose: () => void;
   data: StrategyData;
   profileId: number | null;
@@ -51,6 +51,8 @@ interface Props {
   onDataChange: (data: StrategyData, sel?: { chartId?: number; subsetId?: number }) => void;
   onFeedback: (msg: string) => void;
 }
+
+export type StrategyPanelMode = "review" | "edit" | "analytics";
 
 export function StrategyChartPanel({
   open,
@@ -78,10 +80,10 @@ export function StrategyChartPanel({
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [cellAction, setCellAction] = useState("");
   const [chartView, setChartView] = useState<StrategyChartView>("opening");
-  const [analyticsMode, setAnalyticsMode] = useState(false);
   const [analytics, setAnalytics] = useState<StrategyAnalyticsSummary | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState("");
+  const analyticsMode = mode === "analytics";
 
   useEffect(() => {
     setChartName(currentChart?.name ?? "");
@@ -90,12 +92,8 @@ export function StrategyChartPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartId, chartView]);
 
-  useEffect(() => {
-    if (mode === "edit") setAnalyticsMode(false);
-  }, [mode]);
-
   const refreshAnalytics = useCallback(() => {
-    if (!open) return;
+    if (!open || !analyticsMode) return;
     setAnalyticsLoading(true);
     setAnalyticsError("");
     api
@@ -106,11 +104,11 @@ export function StrategyChartPanel({
         setAnalyticsError(error instanceof Error ? error.message : "Could not load analytics.");
       })
       .finally(() => setAnalyticsLoading(false));
-  }, [open]);
+  }, [analyticsMode, open]);
 
   useEffect(() => {
-    if (open && mode === "review") refreshAnalytics();
-  }, [open, mode, refreshAnalytics]);
+    if (open && analyticsMode) refreshAnalytics();
+  }, [analyticsMode, open, refreshAnalytics]);
 
   // --- criteria (live drill subset) mutations ---
   const updateCriteria = (next: StrategyCriteria) => onCriteriaChange(next);
@@ -396,10 +394,12 @@ export function StrategyChartPanel({
       onClose={onClose}
       className="drawer-wide"
       eyebrow="Basic Strategy"
-      title={mode === "edit" ? "Edit Strategy" : "Review Strategy"}
+      title={
+        mode === "edit" ? "Edit Strategy" : analyticsMode ? "Strategy Analytics" : "Review Strategy"
+      }
     >
       <section
-        className="strategy-chart-tools strategy-review-selects"
+        className={`strategy-chart-tools strategy-review-selects${analyticsMode ? " is-analytics-selects" : ""}`}
         aria-label="Strategy drill setup"
       >
         <label>
@@ -430,47 +430,35 @@ export function StrategyChartPanel({
             )}
           </select>
         </label>
-        <div className="strategy-view-toggle" role="group" aria-label="Strategy chart view">
-          <button
-            type="button"
-            className={!analyticsMode && chartView === "opening" ? "is-active" : ""}
-            onClick={() => {
-              setAnalyticsMode(false);
-              setChartView("opening");
-            }}
-          >
-            Opening hand
-          </button>
-          <button
-            type="button"
-            className={!analyticsMode && chartView === "fallback" ? "is-active" : ""}
-            onClick={() => {
-              setAnalyticsMode(false);
-              setChartView("fallback");
-            }}
-          >
-            After hit fallback
-          </button>
-          {mode === "review" ? (
+        {!analyticsMode ? (
+          <>
+            <div className="strategy-view-toggle" role="group" aria-label="Strategy chart view">
+              <button
+                type="button"
+                className={chartView === "opening" ? "is-active" : ""}
+                onClick={() => setChartView("opening")}
+              >
+                Opening hand
+              </button>
+              <button
+                type="button"
+                className={chartView === "fallback" ? "is-active" : ""}
+                onClick={() => setChartView("fallback")}
+              >
+                After hit fallback
+              </button>
+            </div>
             <button
               type="button"
-              className={analyticsMode ? "is-active" : ""}
-              onClick={() => setAnalyticsMode(true)}
+              className="ghost-button"
+              onClick={() => {
+                setMode("edit");
+              }}
             >
-              Analytics
+              Edit chart
             </button>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          className="ghost-button"
-          onClick={() => {
-            setAnalyticsMode(false);
-            setMode("edit");
-          }}
-        >
-          Edit chart
-        </button>
+          </>
+        ) : null}
       </section>
 
       {analyticsMode ? (
@@ -534,10 +522,10 @@ export function StrategyChartPanel({
         </>
       )}
 
-      <div className={`strategy-chart-editor${mode === "review" ? " is-compact-review" : ""}`}>
+      <div className={`strategy-chart-editor${mode !== "edit" ? " is-compact-review" : ""}`}>
         {!currentChart ? (
           <p className="empty-state">No strategy chart loaded.</p>
-        ) : mode === "review" ? (
+        ) : mode !== "edit" ? (
           <>
             <div className="strategy-review-layout">
               <div className="strategy-review-main-chart">

@@ -6,7 +6,7 @@ import { api } from "../../lib/api";
 import { randomRank, type GameCard } from "../../lib/cards";
 import { TrackingControls } from "../analytics/AnalyticsShared";
 import { trackStrategyAttempt } from "../analytics/tracker";
-import { StrategyChartPanel } from "./StrategyChartPanel";
+import { StrategyChartPanel, type StrategyPanelMode } from "./StrategyChartPanel";
 import { StrategyRulesPanel } from "./StrategyRulesPanel";
 import {
   STRATEGY_ACTION_KEYS,
@@ -75,7 +75,7 @@ export function BasicStrategy() {
   }, [profileId, chartId, subsetId]);
   const [session, setSession] = useState<Session>(EMPTY_SESSION);
   const [criteria, setCriteria] = useState<StrategyCriteria>(defaultStrategyCriteria);
-  const [panelMode, setPanelMode] = useState<"review" | "edit" | null>(null);
+  const [panelMode, setPanelMode] = useState<StrategyPanelMode | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
   const dealTimer = useRef<number | null>(null);
 
@@ -432,6 +432,9 @@ export function BasicStrategy() {
       <TopBar eyebrow="Basic Strategy" title="Basic Strategy Drill">
         <button type="button" className="ghost-button" onClick={() => setPanelMode("review")}>
           <span>Review chart</span>
+        </button>
+        <button type="button" className="ghost-button" onClick={() => setPanelMode("analytics")}>
+          <span>Analytics</span>
         </button>
         <button
           type="button"

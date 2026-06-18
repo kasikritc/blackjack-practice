@@ -1907,10 +1907,13 @@ button:disabled {
 .strategy-review-selects {
   grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.75fr) auto auto;
 }
+.strategy-review-selects.is-analytics-selects {
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.75fr);
+}
 .strategy-view-toggle {
   min-height: 44px;
   display: inline-grid;
-  grid-template-columns: repeat(3, max-content);
+  grid-template-columns: repeat(2, max-content);
   align-items: stretch;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;

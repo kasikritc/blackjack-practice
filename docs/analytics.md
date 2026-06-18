@@ -4,7 +4,7 @@ This app stores one-user blackjack counting-practice analytics in local SQLite a
 
 ## Tracking Control
 
-Tracking starts on by default for each browser app session. A SQLite `sessions` row is not created at page load; it is created only when the practitioner sees the first visible card while tracking is enabled. When tracking is turned off, gameplay continues but no new sessions, shoes, hands, cards, or count checks are written until tracking is turned back on.
+Tracking starts on by default for each browser app session. A SQLite `sessions` row is not created at page load; it is created only when the practitioner creates the first tracked event while tracking is enabled. When tracking is turned off, gameplay continues but no new sessions, shoes, hands, cards, count checks, or strategy attempts are written until tracking is turned back on.
 
 Sessions with visible cards but no count checks are valid and retained. They contribute to exposure and volume analytics, but accuracy and mastery metrics remain unavailable until at least one count check is submitted.
 
@@ -146,6 +146,25 @@ Collected fields include:
 
 This table is used to analyze whether errors correlate with low cards, high cards, neutral cards, dealer hole-card reveals, table size, shoe display mode, or actual deal speed.
 
+### `strategy_attempts`
+
+One row per submitted Basic Strategy decision point. Initial two-card decisions and later after-hit decisions are logged separately when tracking is enabled.
+
+Collected fields include:
+
+- `session_id`
+- `rule_profile_id`, `chart_id`, `subset_id`
+- `hand_number`
+- `category`: `hard`, `soft`, or `pair`
+- `row_key`: normalized table row, such as `h16`, `s17`, or `p8`
+- `dealer_upcard`
+- `player_cards_json`
+- `action`, `expected_action`
+- `correct`
+- `response_time_ms`
+
+Basic Strategy analytics are reset independently with `DELETE /api/analytics/strategy`, which deletes only `strategy_attempts`.
+
 ## Dashboard Metrics
 
 The dashboard derives:
@@ -168,6 +187,7 @@ The dashboard derives:
 - count-pressure breakdown
 - prompt-type breakdown
 - recent session summaries
+- Basic Strategy cell, row, dealer-column, and category accuracy
 
 ## Data Not Collected
 

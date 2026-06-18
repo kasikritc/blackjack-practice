@@ -15,9 +15,18 @@ local/
 # Dev server runtime files
 dev.log
 dev.pid
+dev-sim.log
+dev-sim.pid
 
 # Editor / OS
 .DS_Store
 *.local
 .vscode/*
 !.vscode/extensions.json
+
+# Offline simulator build/output
+sim/build*/
+sim/runs/
+
+sim/evaluation-runs/
+sim/runs/.ui/

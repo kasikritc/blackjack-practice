@@ -2,6 +2,7 @@
 // contract exactly so the existing SQLite data and analytics stay compatible.
 
 import type { AppSettings } from "./settings.js";
+import type { StrategyChartImportResponse } from "./simulation.js";
 import type { StrategyData } from "./strategy.js";
 
 export type AnalyticsRange = "7d" | "30d" | "all";
@@ -148,6 +149,10 @@ export interface CreatedResponse {
 export interface StrategyMutationResponse extends StrategyData {
   id?: number;
   ok?: boolean;
+}
+
+export interface StrategyChartImportedResponse extends StrategyData, StrategyChartImportResponse {
+  ok: true;
 }
 
 // --- Analytics response shapes ---------------------------------------------

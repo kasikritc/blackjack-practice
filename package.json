@@ -1,6 +1,6 @@
 {
   "name": "blackjack-practice",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Mobile-friendly Hi-Lo blackjack card counting practice app.",
   "type": "module",
@@ -20,7 +20,22 @@
     "typecheck": "npm run build:shared && npm run typecheck -w @blackjack/server && npm run typecheck -w @blackjack/client",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "sim:configure": "cmake -S sim -B sim/build -DCMAKE_BUILD_TYPE=Release",
+    "sim:build": "cmake --build sim/build -j",
+    "sim:devices": "sim/build/simulate-strategy devices",
+    "eval:validate": "sim/build/evaluate-strategy validate",
+    "eval:run": "sim/build/evaluate-strategy run",
+    "eval:summarize": "sim/build/evaluate-strategy summarize",
+    "eval:smoke": "sim/build/evaluate-strategy run --config sim/configs/eval-smoke-fresh.json --output /tmp/blackjack-eval-runs && sim/build/evaluate-strategy run --config sim/configs/eval-smoke-continuous.json --output /tmp/blackjack-eval-runs",
+    "sim:smoke": "sim/build/simulate-strategy run --config sim/configs/smoke.json --output /tmp/blackjack-sim-runs",
+    "sim:export-png": "tsx scripts/export-chart-png.ts",
+    "strategy:export": "tsx scripts/export-strategy-package.ts",
+    "sim:test": "ctest --test-dir sim/build --output-on-failure",
+    "sim:sanitize": "cmake -S sim -B sim/build-sanitize -DCMAKE_BUILD_TYPE=Debug -DSIM_ENABLE_SANITIZERS=ON && cmake --build sim/build-sanitize -j && ctest --test-dir sim/build-sanitize --output-on-failure",
+    "sim:check": "npm run sim:build && npm run sim:test && npm run sim:smoke",
+    "dev:sim": "npm run build:shared && npm run dev:sim -w @blackjack/server",
+    "start:sim": "npm run start:sim -w @blackjack/server"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -29,7 +44,9 @@
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
     "globals": "^15.14.0",
+    "playwright": "^1.60.0",
     "prettier": "^3.4.2",
+    "tsx": "^4.22.3",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.1"
   }

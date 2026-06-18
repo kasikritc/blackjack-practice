@@ -1,0 +1,18 @@
+{
+  "name": "eval-smoke-continuous",
+  "seed": "eval-smoke-v1",
+  "strategy": "builtin:basic-6d-h17-das-ls",
+  "mode": "continuous-shoe",
+  "rounds": 10000,
+  "paths": 20,
+  "penetrationPercent": 75,
+  "observerSeats": 1,
+  "roundsPerHour": 100,
+  "confidenceZ": 1.96,
+  "riskBankrollUnits": [50, 100, 200, 500, 1000],
+  "retention": {
+    "mode": "aggregate",
+    "sampleEvery": 1000,
+    "acknowledgeLargeOutput": false
+  }
+}

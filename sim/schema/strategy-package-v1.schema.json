@@ -1,0 +1,574 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackjack-practice.local/schema/strategy-package-v1.json",
+  "title": "Blackjack strategy evaluation package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "rules",
+    "trueCountRounding",
+    "chart",
+    "fallbacks",
+    "deviations",
+    "insurance",
+    "evenMoney",
+    "bettingRamp"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rules": {
+      "$ref": "#/$defs/rules"
+    },
+    "trueCountRounding": {
+      "enum": ["nearest", "truncate", "floor"]
+    },
+    "chart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hard", "soft", "pair"],
+      "properties": {
+        "hard": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "h4",
+            "h5",
+            "h6",
+            "h7",
+            "h8",
+            "h9",
+            "h10",
+            "h11",
+            "h12",
+            "h13",
+            "h14",
+            "h15",
+            "h16",
+            "h17",
+            "h18",
+            "h19",
+            "h20",
+            "h21"
+          ],
+          "properties": {
+            "h4": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h5": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h6": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h7": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h8": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h9": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h10": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h11": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h12": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h13": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h14": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h15": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h16": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h17": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h18": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h19": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h20": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "h21": {
+              "$ref": "#/$defs/dealerCells"
+            }
+          }
+        },
+        "soft": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21"],
+          "properties": {
+            "s13": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "s14": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "s15": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "s16": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "s17": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "s18": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "s19": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "s20": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "s21": {
+              "$ref": "#/$defs/dealerCells"
+            }
+          }
+        },
+        "pair": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pA", "p10", "p9", "p8", "p7", "p6", "p5", "p4", "p3", "p2"],
+          "properties": {
+            "pA": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "p10": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "p9": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "p8": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "p7": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "p6": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "p5": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "p4": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "p3": {
+              "$ref": "#/$defs/dealerCells"
+            },
+            "p2": {
+              "$ref": "#/$defs/dealerCells"
+            }
+          }
+        }
+      }
+    },
+    "fallbacks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hard": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "h4": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h5": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h6": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h7": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h8": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h9": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h10": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h11": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h12": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h13": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h14": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h15": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h16": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h17": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h18": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h19": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h20": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "h21": {
+              "$ref": "#/$defs/fallbackCells"
+            }
+          }
+        },
+        "soft": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "s13": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "s14": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "s15": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "s16": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "s17": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "s18": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "s19": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "s20": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "s21": {
+              "$ref": "#/$defs/fallbackCells"
+            }
+          }
+        },
+        "pair": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pA": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "p10": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "p9": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "p8": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "p7": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "p6": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "p5": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "p4": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "p3": {
+              "$ref": "#/$defs/fallbackCells"
+            },
+            "p2": {
+              "$ref": "#/$defs/fallbackCells"
+            }
+          }
+        }
+      }
+    },
+    "deviations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/actionDeviation"
+      }
+    },
+    "insurance": {
+      "$ref": "#/$defs/sidePolicy"
+    },
+    "evenMoney": {
+      "$ref": "#/$defs/sidePolicy"
+    },
+    "bettingRamp": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["atOrAbove", "units"],
+        "properties": {
+          "atOrAbove": {
+            "type": "integer"
+          },
+          "units": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "action": {
+      "enum": ["hit", "stand", "double", "split", "surrender"]
+    },
+    "dealerCells": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["2", "3", "4", "5", "6", "7", "8", "9", "10", "A"],
+      "properties": {
+        "2": {
+          "$ref": "#/$defs/action"
+        },
+        "3": {
+          "$ref": "#/$defs/action"
+        },
+        "4": {
+          "$ref": "#/$defs/action"
+        },
+        "5": {
+          "$ref": "#/$defs/action"
+        },
+        "6": {
+          "$ref": "#/$defs/action"
+        },
+        "7": {
+          "$ref": "#/$defs/action"
+        },
+        "8": {
+          "$ref": "#/$defs/action"
+        },
+        "9": {
+          "$ref": "#/$defs/action"
+        },
+        "10": {
+          "$ref": "#/$defs/action"
+        },
+        "A": {
+          "$ref": "#/$defs/action"
+        }
+      }
+    },
+    "fallbackCells": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "2": {
+          "enum": ["hit", "stand"]
+        },
+        "3": {
+          "enum": ["hit", "stand"]
+        },
+        "4": {
+          "enum": ["hit", "stand"]
+        },
+        "5": {
+          "enum": ["hit", "stand"]
+        },
+        "6": {
+          "enum": ["hit", "stand"]
+        },
+        "7": {
+          "enum": ["hit", "stand"]
+        },
+        "8": {
+          "enum": ["hit", "stand"]
+        },
+        "9": {
+          "enum": ["hit", "stand"]
+        },
+        "10": {
+          "enum": ["hit", "stand"]
+        },
+        "A": {
+          "enum": ["hit", "stand"]
+        }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decks",
+        "dealerHitsSoft17",
+        "dealerPeek",
+        "dealerHoleCard",
+        "blackjackPayout",
+        "doubleRule",
+        "doubleAfterSplit",
+        "surrender",
+        "maxSplitHands",
+        "resplitAces",
+        "hitSplitAces",
+        "oneCardSplitAces",
+        "insurance",
+        "splitTensByValue",
+        "customRules"
+      ],
+      "properties": {
+        "decks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "dealerHitsSoft17": {
+          "type": "boolean"
+        },
+        "dealerPeek": {
+          "const": true
+        },
+        "dealerHoleCard": {
+          "const": true
+        },
+        "blackjackPayout": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?:[0-9]+(\\.[0-9]+)?$"
+        },
+        "doubleRule": {
+          "enum": ["none", "anyTwo", "hardOnly", "nineToEleven", "tenToEleven"]
+        },
+        "doubleAfterSplit": {
+          "type": "boolean"
+        },
+        "surrender": {
+          "enum": ["none", "late", "early"]
+        },
+        "maxSplitHands": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "resplitAces": {
+          "type": "boolean"
+        },
+        "hitSplitAces": {
+          "type": "boolean"
+        },
+        "oneCardSplitAces": {
+          "type": "boolean"
+        },
+        "insurance": {
+          "type": "boolean"
+        },
+        "splitTensByValue": {
+          "type": "boolean"
+        },
+        "customRules": {
+          "type": "object",
+          "maxProperties": 0
+        }
+      }
+    },
+    "actionDeviation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "rowKey", "dealerUpcard", "comparison", "trueCount", "action"],
+      "properties": {
+        "category": {
+          "enum": ["hard", "soft", "pair"]
+        },
+        "rowKey": {
+          "type": "string"
+        },
+        "dealerUpcard": {
+          "enum": ["2", "3", "4", "5", "6", "7", "8", "9", "10", "A"]
+        },
+        "comparison": {
+          "enum": ["atOrAbove", "atOrBelow"]
+        },
+        "trueCount": {
+          "type": "integer"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "fallback": {
+          "enum": ["hit", "stand"]
+        }
+      }
+    },
+    "sideDeviation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comparison", "trueCount", "decision"],
+      "properties": {
+        "comparison": {
+          "enum": ["atOrAbove", "atOrBelow"]
+        },
+        "trueCount": {
+          "type": "integer"
+        },
+        "decision": {
+          "enum": ["take", "decline"]
+        }
+      }
+    },
+    "sidePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base", "deviations"],
+      "properties": {
+        "base": {
+          "enum": ["take", "decline"]
+        },
+        "deviations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sideDeviation"
+          }
+        }
+      }
+    }
+  }
+}

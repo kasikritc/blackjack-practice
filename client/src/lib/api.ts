@@ -16,6 +16,8 @@ import type {
   ShoeEndedRequest,
   ShoeStartedRequest,
   StrategyAttemptRequest,
+  StrategyChartImportedResponse,
+  StrategyChartImportRequest,
   StrategyData,
   StrategyMutationResponse
 } from "@blackjack/shared";
@@ -74,6 +76,8 @@ export const api = {
     chart?: unknown;
     cloneFromChartId?: number;
   }) => request<StrategyMutationResponse>("POST", "/api/strategy/charts", payload),
+  importGeneratedChart: (payload: StrategyChartImportRequest) =>
+    request<StrategyChartImportedResponse>("POST", "/api/strategy/charts/import", payload),
   updateChart: (id: number, payload: { ruleProfileId?: number; name?: string; chart?: unknown }) =>
     request<StrategyMutationResponse>("PATCH", `/api/strategy/charts/${id}`, payload),
   createSubset: (payload: {

@@ -1,8 +1,10 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 
 export function Layout() {
+  const location = useLocation();
+  const simulator = location.pathname.startsWith("/simulator");
   return (
-    <main className="app">
+    <main className={`app${simulator ? " simulator-app" : ""}`}>
       <Outlet />
     </main>
   );

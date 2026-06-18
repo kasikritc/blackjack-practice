@@ -1,0 +1,31 @@
+{
+  "name": "smoke-1k-6d-h17-das-ls",
+  "seed": "42",
+  "rules": {
+    "decks": 6,
+    "dealerHitsSoft17": true,
+    "dealerPeek": true,
+    "dealerHoleCard": true,
+    "blackjackPayout": "3:2",
+    "doubleRule": "anyTwo",
+    "doubleAfterSplit": true,
+    "surrender": "late",
+    "maxSplitHands": 4,
+    "resplitAces": false,
+    "hitSplitAces": false,
+    "oneCardSplitAces": true,
+    "insurance": true,
+    "splitTensByValue": false,
+    "customRules": {}
+  },
+  "minSamplesPerAction": 1000,
+  "maxSamplesPerAction": 1000,
+  "batchSize": 100,
+  "shoeSamplesPerBucket": 20,
+  "maxPolicyIterations": 2,
+  "minimumEvMargin": 0.001,
+  "confidenceZ": 1.96,
+  "trueCountBuckets": [0],
+  "decksRemainingBuckets": [5.5],
+  "trueCountRounding": "nearest"
+}

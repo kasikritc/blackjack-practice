@@ -4,6 +4,5 @@ data
 **/dist
 package-lock.json
 
-sim/build
-sim/build-prof
 sim/runs
+sim/build*

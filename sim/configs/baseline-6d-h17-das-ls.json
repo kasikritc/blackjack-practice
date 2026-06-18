@@ -1,0 +1,31 @@
+{
+  "name": "baseline-6d-h17-das-ls",
+  "seed": "baseline-v1",
+  "rules": {
+    "decks": 6,
+    "dealerHitsSoft17": true,
+    "dealerPeek": true,
+    "dealerHoleCard": true,
+    "blackjackPayout": "3:2",
+    "doubleRule": "anyTwo",
+    "doubleAfterSplit": true,
+    "surrender": "late",
+    "maxSplitHands": 4,
+    "resplitAces": false,
+    "hitSplitAces": false,
+    "oneCardSplitAces": true,
+    "insurance": true,
+    "splitTensByValue": false,
+    "customRules": {}
+  },
+  "minSamplesPerAction": 100000,
+  "maxSamplesPerAction": 1000000,
+  "batchSize": 10000,
+  "shoeSamplesPerBucket": 1000,
+  "maxPolicyIterations": 8,
+  "minimumEvMargin": 0.0001,
+  "confidenceZ": 1.96,
+  "trueCountBuckets": [0],
+  "decksRemainingBuckets": [5.5],
+  "trueCountRounding": "nearest"
+}

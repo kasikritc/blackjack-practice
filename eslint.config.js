@@ -11,8 +11,8 @@ export default tseslint.config(
       "**/node_modules/**",
       "data/**",
       "basic-strategy-calculator/**",
-      "sim/build/**",
-      "sim/build-prof/**",
+      "sim/build*/**",
+      "sim/runs/**",
       "*.cjs"
     ]
   },

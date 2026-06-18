@@ -314,7 +314,7 @@ export function TrackingControls({ className = "tracking-controls" }: { classNam
   if (available && status.trackingEnabled && status.sessionId) {
     message = `Tracking session #${status.sessionId}`;
   } else if (available && status.trackingEnabled) {
-    message = "Tracking ready. Session starts on first visible card.";
+    message = "Tracking ready. Session starts on first tracked event.";
   } else if (available) {
     message = "Tracking paused. Practice continues without new data.";
   }

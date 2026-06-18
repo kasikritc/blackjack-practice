@@ -15,6 +15,7 @@ import type {
   RecentSessionsResponse,
   ShoeEndedRequest,
   ShoeStartedRequest,
+  StrategyAnalyticsSummary,
   StrategyAttemptRequest,
   StrategyChartImportedResponse,
   StrategyChartImportRequest,
@@ -65,6 +66,9 @@ export const api = {
   // Strategy
   strategyAttempt: (payload: StrategyAttemptRequest) =>
     request<CreatedResponse>("POST", "/api/events/strategy-attempt", payload),
+  strategyAnalyticsSummary: () =>
+    request<StrategyAnalyticsSummary>("GET", "/api/analytics/strategy-summary"),
+  resetStrategyAnalytics: () => request<{ ok: boolean }>("DELETE", "/api/analytics/strategy"),
   getStrategy: () => request<StrategyData>("GET", "/api/strategy"),
   createRuleProfile: (payload: { name?: string; rules?: unknown }) =>
     request<StrategyMutationResponse>("POST", "/api/strategy/rule-profiles", payload),

@@ -4,6 +4,8 @@ import { Hand } from "../../components/PlayingCard";
 import { TopBar } from "../../components/TopBar";
 import { api } from "../../lib/api";
 import { randomRank, type GameCard } from "../../lib/cards";
+import { TrackingControls } from "../analytics/AnalyticsShared";
+import { trackStrategyAttempt } from "../analytics/tracker";
 import { StrategyChartPanel } from "./StrategyChartPanel";
 import { StrategyRulesPanel } from "./StrategyRulesPanel";
 import {
@@ -186,22 +188,20 @@ export function BasicStrategy() {
 
   const recordAttempt = (action: string, dec: NonNullable<typeof decision>, correct: boolean) => {
     if (!serverAvailable || !dec.expectedAction) return;
-    api
-      .strategyAttempt({
-        ruleProfileId: profileId ?? undefined,
-        chartId: chartId ?? undefined,
-        subsetId: subsetId ?? undefined,
-        handNumber: session.handNumber,
-        category: dec.category,
-        rowKey: dec.rowKey,
-        dealerUpcard: dec.dealer,
-        playerCards: session.playerHand.map(card => ({ rank: card.rank, suit: card.suit })),
-        action,
-        expectedAction: dec.expectedAction,
-        correct,
-        responseTimeMs: Date.now() - (session.promptOpenedAt || Date.now())
-      })
-      .catch(() => {});
+    trackStrategyAttempt({
+      ruleProfileId: profileId ?? undefined,
+      chartId: chartId ?? undefined,
+      subsetId: subsetId ?? undefined,
+      handNumber: session.handNumber,
+      category: dec.category,
+      rowKey: dec.rowKey,
+      dealerUpcard: dec.dealer,
+      playerCards: session.playerHand.map(card => ({ rank: card.rank, suit: card.suit })),
+      action,
+      expectedAction: dec.expectedAction,
+      correct,
+      responseTimeMs: Date.now() - (session.promptOpenedAt || Date.now())
+    });
   };
 
   const submitAction = useCallback(
@@ -452,6 +452,8 @@ export function BasicStrategy() {
           Next prompt
         </button>
       </section>
+
+      <TrackingControls className="tracking-bar" />
 
       <section className="strategy-rules-strip" aria-label="Current house rules">
         <div className="strategy-rules-summary">

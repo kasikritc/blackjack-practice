@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
-import type { StrategyData } from "@blackjack/shared";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import type {
+  StrategyAnalyticsMetric,
+  StrategyAnalyticsSummary,
+  StrategyData
+} from "@blackjack/shared";
 import { Drawer } from "../../components/Drawer";
 import { api } from "../../lib/api";
+import { formatMs, formatPercent } from "../../lib/format";
 import {
   STRATEGY_ACTION_ABBREVIATIONS,
   STRATEGY_ACTION_LABELS,
@@ -25,8 +30,8 @@ import {
 
 interface Props {
   open: boolean;
-  mode: "review" | "edit";
-  setMode: (mode: "review" | "edit") => void;
+  mode: StrategyPanelMode;
+  setMode: (mode: StrategyPanelMode) => void;
   onClose: () => void;
   data: StrategyData;
   profileId: number | null;
@@ -46,6 +51,8 @@ interface Props {
   onDataChange: (data: StrategyData, sel?: { chartId?: number; subsetId?: number }) => void;
   onFeedback: (msg: string) => void;
 }
+
+export type StrategyPanelMode = "review" | "edit" | "analytics";
 
 export function StrategyChartPanel({
   open,
@@ -73,6 +80,10 @@ export function StrategyChartPanel({
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [cellAction, setCellAction] = useState("");
   const [chartView, setChartView] = useState<StrategyChartView>("opening");
+  const [analytics, setAnalytics] = useState<StrategyAnalyticsSummary | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
+  const analyticsMode = mode === "analytics";
 
   useEffect(() => {
     setChartName(currentChart?.name ?? "");
@@ -80,6 +91,24 @@ export function StrategyChartPanel({
     setCellAction("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartId, chartView]);
+
+  const refreshAnalytics = useCallback(() => {
+    if (!open || !analyticsMode) return;
+    setAnalyticsLoading(true);
+    setAnalyticsError("");
+    api
+      .strategyAnalyticsSummary()
+      .then(setAnalytics)
+      .catch(error => {
+        setAnalytics(null);
+        setAnalyticsError(error instanceof Error ? error.message : "Could not load analytics.");
+      })
+      .finally(() => setAnalyticsLoading(false));
+  }, [analyticsMode, open]);
+
+  useEffect(() => {
+    if (open && analyticsMode) refreshAnalytics();
+  }, [analyticsMode, open, refreshAnalytics]);
 
   // --- criteria (live drill subset) mutations ---
   const updateCriteria = (next: StrategyCriteria) => onCriteriaChange(next);
@@ -114,7 +143,17 @@ export function StrategyChartPanel({
       getStrategyCellAction(currentChart?.chart, category, rowKey, dealer)
     );
 
+  const analyticsCells = new Map((analytics?.cells ?? []).map(metric => [metric.key, metric]));
+  const analyticsRows = new Map((analytics?.rows ?? []).map(metric => [metric.key, metric]));
+  const analyticsDealers = new Map(
+    (analytics?.dealerUpcards ?? []).map(metric => [metric.dealerUpcard ?? metric.key, metric])
+  );
+  const analyticsCategories = new Map(
+    (analytics?.categories ?? []).map(metric => [metric.category ?? metric.key, metric])
+  );
+
   const onCellClick = (category: string, rowKey: string, dealer: string) => {
+    if (analyticsMode) return;
     if (chartView === "fallback" && !fallbackEditable(category, rowKey, dealer)) return;
     const id = strategyCellId(category, rowKey, dealer);
     setEditingCell(id);
@@ -163,6 +202,21 @@ export function StrategyChartPanel({
 
   const clearHighlights = () => onCriteriaChange(defaultStrategyCriteria());
 
+  const resetAnalytics = async () => {
+    if (
+      !window.confirm("Reset only Basic Strategy analytics? Other drill analytics stay intact.")
+    ) {
+      return;
+    }
+    try {
+      await api.resetStrategyAnalytics();
+      await api.strategyAnalyticsSummary().then(setAnalytics);
+      onFeedback("Basic strategy analytics reset.");
+    } catch (error) {
+      onFeedback(error instanceof Error ? error.message : "Could not reset strategy analytics.");
+    }
+  };
+
   const saveSubset = async () => {
     if (!currentChart) return;
     try {
@@ -182,28 +236,32 @@ export function StrategyChartPanel({
   const cellsLocked = criteria.cells.length > 0;
 
   function CategoryToggle({ category, label }: { category: string; label: string }) {
+    const metric = analyticsCategories.get(category);
     const included = criteria.categories.includes(category as never) && !cellsLocked;
     return (
       <button
         type="button"
-        className={`strategy-row-toggle${included ? " is-included" : ""}`}
-        onClick={() => toggleCategory(category)}
+        className={`strategy-row-toggle${included && !analyticsMode ? " is-included" : ""}${analyticsMode ? " is-analytics-header" : ""}`}
+        onClick={() => (analyticsMode ? undefined : toggleCategory(category))}
       >
-        {label}
+        <span>{label}</span>
+        {analyticsMode ? <MetricTiny metric={metric} /> : null}
       </button>
     );
   }
 
   function DealerHeader({ dealer }: { dealer: string }) {
+    const metric = analyticsDealers.get(dealer);
     const included = criteria.dealerUpcards.includes(dealer) && !cellsLocked;
     return (
       <th>
         <button
           type="button"
-          className={`strategy-column-toggle${included ? " is-included" : ""}`}
-          onClick={() => toggleDealer(dealer)}
+          className={`strategy-column-toggle${included && !analyticsMode ? " is-included" : ""}${analyticsMode ? " is-analytics-header" : ""}`}
+          onClick={() => (analyticsMode ? undefined : toggleDealer(dealer))}
         >
-          {dealer}
+          <span>{dealer}</span>
+          {analyticsMode ? <MetricTiny metric={metric} /> : null}
         </button>
       </th>
     );
@@ -218,6 +276,7 @@ export function StrategyChartPanel({
     rowKey: string;
     dealer: string;
   }) {
+    const metric = analyticsCells.get(strategyCellId(category, rowKey, dealer));
     const action = getStrategyViewCellAction(
       currentChart?.chart,
       chartView,
@@ -231,9 +290,12 @@ export function StrategyChartPanel({
     const label =
       (action && STRATEGY_ACTION_ABBREVIATIONS[action]) ||
       (chartView === "fallback" && editableFallback ? "·" : "-");
-    const cls = `strategy-cell${action ? ` action-${action}` : ""}${included ? " is-included" : " is-excluded"}${chartView === "fallback" && editableFallback ? " is-fallback-needed" : ""}${chartView === "fallback" && !editableFallback ? " is-fallback-disabled" : ""}`;
-    const title =
-      chartView === "fallback"
+    const cls = analyticsMode
+      ? "strategy-cell is-analytics-cell"
+      : `strategy-cell${action ? ` action-${action}` : ""}${included ? " is-included" : " is-excluded"}${chartView === "fallback" && editableFallback ? " is-fallback-needed" : ""}${chartView === "fallback" && !editableFallback ? " is-fallback-disabled" : ""}`;
+    const title = analyticsMode
+      ? `${metric?.label ?? "No attempts"}: ${metric ? `${formatPercent(metric.accuracy)}%` : "no data"}`
+      : chartView === "fallback"
         ? editableFallback
           ? `${(action && STRATEGY_ACTION_LABELS[action]) || "Unset"} fallback for ${STRATEGY_ACTION_LABELS[primaryAction || ""] || primaryAction}`
           : "No after-hit fallback needed for this cell"
@@ -246,10 +308,11 @@ export function StrategyChartPanel({
           type="button"
           className={cls}
           title={title}
-          disabled={chartView === "fallback" && !editableFallback}
+          style={analyticsMode ? analyticsCellStyle(metric) : undefined}
+          disabled={!analyticsMode && chartView === "fallback" && !editableFallback}
           onClick={() => onCellClick(category, rowKey, dealer)}
         >
-          {label}
+          {analyticsMode ? <MetricCell metric={metric} /> : label}
         </button>
       </td>
     );
@@ -264,15 +327,17 @@ export function StrategyChartPanel({
     rowKey: string;
     label: string;
   }) {
+    const metric = analyticsRows.get(`${category}:${rowKey}`);
     const included = isStrategyRowIncluded(criteria, category, rowKey);
     return (
       <th>
         <button
           type="button"
-          className={`strategy-row-toggle${included ? " is-included" : ""}`}
-          onClick={() => toggleRow(category, rowKey)}
+          className={`strategy-row-toggle${included && !analyticsMode ? " is-included" : ""}${analyticsMode ? " is-analytics-header" : ""}`}
+          onClick={() => (analyticsMode ? undefined : toggleRow(category, rowKey))}
         >
-          {label}
+          <span>{label}</span>
+          {analyticsMode ? <MetricTiny metric={metric} /> : null}
         </button>
       </th>
     );
@@ -329,10 +394,12 @@ export function StrategyChartPanel({
       onClose={onClose}
       className="drawer-wide"
       eyebrow="Basic Strategy"
-      title={mode === "edit" ? "Edit Strategy" : "Review Strategy"}
+      title={
+        mode === "edit" ? "Edit Strategy" : analyticsMode ? "Strategy Analytics" : "Review Strategy"
+      }
     >
       <section
-        className="strategy-chart-tools strategy-review-selects"
+        className={`strategy-chart-tools strategy-review-selects${analyticsMode ? " is-analytics-selects" : ""}`}
         aria-label="Strategy drill setup"
       >
         <label>
@@ -363,80 +430,102 @@ export function StrategyChartPanel({
             )}
           </select>
         </label>
-        <div className="strategy-view-toggle" role="group" aria-label="Strategy chart view">
-          <button
-            type="button"
-            className={chartView === "opening" ? "is-active" : ""}
-            onClick={() => setChartView("opening")}
-          >
-            Opening hand
-          </button>
-          <button
-            type="button"
-            className={chartView === "fallback" ? "is-active" : ""}
-            onClick={() => setChartView("fallback")}
-          >
-            After hit fallback
-          </button>
-        </div>
-        <button type="button" className="ghost-button" onClick={() => setMode("edit")}>
-          Edit chart
-        </button>
+        {!analyticsMode ? (
+          <>
+            <div className="strategy-view-toggle" role="group" aria-label="Strategy chart view">
+              <button
+                type="button"
+                className={chartView === "opening" ? "is-active" : ""}
+                onClick={() => setChartView("opening")}
+              >
+                Opening hand
+              </button>
+              <button
+                type="button"
+                className={chartView === "fallback" ? "is-active" : ""}
+                onClick={() => setChartView("fallback")}
+              >
+                After hit fallback
+              </button>
+            </div>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                setMode("edit");
+              }}
+            >
+              Edit chart
+            </button>
+          </>
+        ) : null}
       </section>
 
-      <section className="strategy-chart-tools" aria-label="Strategy chart tools">
-        <label>
-          Chart name
-          <input type="text" value={chartName} onChange={e => setChartName(e.target.value)} />
-        </label>
-        <label>
-          Cell action
-          <select
-            value={cellAction}
-            disabled={!editingCell}
-            onChange={e => onCellActionChange(e.target.value)}
-          >
-            <option value="">Select a cell</option>
-            {(chartView === "fallback"
-              ? STRATEGY_FALLBACK_ACTIONS_ORDER
-              : STRATEGY_ACTIONS_ORDER
-            ).map(action => (
-              <option key={action} value={action}>
-                {STRATEGY_ACTION_LABELS[action]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" className="ghost-button" onClick={() => void cloneChart()}>
-          Clone to current rules
-        </button>
-        <button type="button" className="primary-button" onClick={() => void saveChart()}>
-          Save chart
-        </button>
-      </section>
+      {analyticsMode ? (
+        <StrategyAnalyticsTools
+          analytics={analytics}
+          loading={analyticsLoading}
+          error={analyticsError}
+          onRefresh={refreshAnalytics}
+          onReset={() => void resetAnalytics()}
+        />
+      ) : (
+        <>
+          <section className="strategy-chart-tools" aria-label="Strategy chart tools">
+            <label>
+              Chart name
+              <input type="text" value={chartName} onChange={e => setChartName(e.target.value)} />
+            </label>
+            <label>
+              Cell action
+              <select
+                value={cellAction}
+                disabled={!editingCell}
+                onChange={e => onCellActionChange(e.target.value)}
+              >
+                <option value="">Select a cell</option>
+                {(chartView === "fallback"
+                  ? STRATEGY_FALLBACK_ACTIONS_ORDER
+                  : STRATEGY_ACTIONS_ORDER
+                ).map(action => (
+                  <option key={action} value={action}>
+                    {STRATEGY_ACTION_LABELS[action]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="ghost-button" onClick={() => void cloneChart()}>
+              Clone to current rules
+            </button>
+            <button type="button" className="primary-button" onClick={() => void saveChart()}>
+              Save chart
+            </button>
+          </section>
 
-      <section className="strategy-chart-tools" aria-label="Subset tools">
-        <label>
-          Subset name
-          <input
-            type="text"
-            placeholder="Custom subset"
-            value={subsetName}
-            onChange={e => setSubsetName(e.target.value)}
-          />
-        </label>
-        <button type="button" className="ghost-button" onClick={clearHighlights}>
-          Clear highlights
-        </button>
-        <button type="button" className="ghost-button" onClick={() => void saveSubset()}>
-          Save highlighted subset
-        </button>
-      </section>
+          <section className="strategy-chart-tools" aria-label="Subset tools">
+            <label>
+              Subset name
+              <input
+                type="text"
+                placeholder="Custom subset"
+                value={subsetName}
+                onChange={e => setSubsetName(e.target.value)}
+              />
+            </label>
+            <button type="button" className="ghost-button" onClick={clearHighlights}>
+              Clear highlights
+            </button>
+            <button type="button" className="ghost-button" onClick={() => void saveSubset()}>
+              Save highlighted subset
+            </button>
+          </section>
+        </>
+      )}
 
-      <div className={`strategy-chart-editor${mode === "review" ? " is-compact-review" : ""}`}>
+      <div className={`strategy-chart-editor${mode !== "edit" ? " is-compact-review" : ""}`}>
         {!currentChart ? (
           <p className="empty-state">No strategy chart loaded.</p>
-        ) : mode === "review" ? (
+        ) : mode !== "edit" ? (
           <>
             <div className="strategy-review-layout">
               <div className="strategy-review-main-chart">
@@ -448,25 +537,31 @@ export function StrategyChartPanel({
               </div>
             </div>
             <div className="strategy-review-footer">
-              <section>
-                <h3>Actions</h3>
-                <div className="strategy-action-legend" aria-label="Strategy abbreviations">
-                  {STRATEGY_ACTIONS_ORDER.map(action => (
-                    <span className={`strategy-legend-chip action-${action}`} key={action}>
-                      <strong>{STRATEGY_ACTION_ABBREVIATIONS[action]}</strong>
-                      {STRATEGY_ACTION_LABELS[action]}
-                    </span>
-                  ))}
-                </div>
-              </section>
-              <section>
-                <h3>{chartView === "fallback" ? "Fallbacks" : "Practice Include"}</h3>
-                <p>
-                  {chartView === "fallback"
-                    ? "Dot cells need an after-hit answer. Select one, choose Hit or Stand, then save the chart."
-                    : "Crossed-out cells are excluded from the drill. Click rows, columns, sections, or cells to adjust the current subset."}
-                </p>
-              </section>
+              {analyticsMode ? (
+                <StrategyAnalyticsInsights analytics={analytics} />
+              ) : (
+                <>
+                  <section>
+                    <h3>Actions</h3>
+                    <div className="strategy-action-legend" aria-label="Strategy abbreviations">
+                      {STRATEGY_ACTIONS_ORDER.map(action => (
+                        <span className={`strategy-legend-chip action-${action}`} key={action}>
+                          <strong>{STRATEGY_ACTION_ABBREVIATIONS[action]}</strong>
+                          {STRATEGY_ACTION_LABELS[action]}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                  <section>
+                    <h3>{chartView === "fallback" ? "Fallbacks" : "Practice Include"}</h3>
+                    <p>
+                      {chartView === "fallback"
+                        ? "Dot cells need an after-hit answer. Select one, choose Hit or Stand, then save the chart."
+                        : "Crossed-out cells are excluded from the drill. Click rows, columns, sections, or cells to adjust the current subset."}
+                    </p>
+                  </section>
+                </>
+              )}
             </div>
           </>
         ) : (
@@ -489,5 +584,138 @@ export function StrategyChartPanel({
         )}
       </div>
     </Drawer>
+  );
+}
+
+function mix(start: number, end: number, weight: number): number {
+  return Math.round(start + (end - start) * weight);
+}
+
+function analyticsCellStyle(metric: StrategyAnalyticsMetric | undefined): CSSProperties {
+  if (!metric?.attempts) return {};
+  const accuracy = Math.max(0, Math.min(100, metric.accuracy));
+  const red = [228, 95, 95];
+  const gold = [217, 180, 90];
+  const green = [103, 213, 138];
+  const left = accuracy < 50;
+  const from = left ? red : gold;
+  const to = left ? gold : green;
+  const weight = left ? accuracy / 50 : (accuracy - 50) / 50;
+  const [r, g, b] = from.map((value, index) => mix(value, to[index], weight));
+  return {
+    background: `rgba(${r}, ${g}, ${b}, ${0.18 + accuracy / 420})`,
+    color: accuracy >= 65 ? "#e8fff0" : accuracy >= 40 ? "#fff3ca" : "#ffe1e1"
+  };
+}
+
+function MetricCell({ metric }: { metric: StrategyAnalyticsMetric | undefined }) {
+  if (!metric?.attempts) {
+    return (
+      <span className="strategy-analytics-cell-content">
+        <strong>—</strong>
+        <small>0 / 0</small>
+      </span>
+    );
+  }
+  return (
+    <span className="strategy-analytics-cell-content">
+      <strong>{formatPercent(metric.accuracy)}%</strong>
+      <small>
+        {metric.correct} / {metric.attempts}
+      </small>
+    </span>
+  );
+}
+
+function MetricTiny({ metric }: { metric: StrategyAnalyticsMetric | undefined }) {
+  if (!metric?.attempts) return <small className="strategy-analytics-tiny">0 / 0</small>;
+  return (
+    <small className="strategy-analytics-tiny">
+      {formatPercent(metric.accuracy)}% · {metric.correct}/{metric.attempts}
+    </small>
+  );
+}
+
+function MetricPill({ metric }: { metric: StrategyAnalyticsMetric }) {
+  return (
+    <span className="strategy-analytics-pill">
+      <strong>{metric.label}</strong>
+      <span>
+        {formatPercent(metric.accuracy)}% · {metric.correct}/{metric.attempts}
+      </span>
+    </span>
+  );
+}
+
+function StrategyAnalyticsTools({
+  analytics,
+  loading,
+  error,
+  onRefresh,
+  onReset
+}: {
+  analytics: StrategyAnalyticsSummary | null;
+  loading: boolean;
+  error: string;
+  onRefresh: () => void;
+  onReset: () => void;
+}) {
+  const totals = analytics?.totals;
+  return (
+    <section
+      className="strategy-chart-tools strategy-analytics-tools"
+      aria-label="Strategy analytics tools"
+    >
+      <div className="strategy-analytics-total">
+        <span>Overall accuracy</span>
+        <strong>{totals?.attempts ? `${formatPercent(totals.accuracy)}%` : "—"}</strong>
+        <small>
+          {totals?.correct ?? 0} / {totals?.attempts ?? 0} decisions · median{" "}
+          {formatMs(totals?.medianResponse ?? 0)}
+        </small>
+      </div>
+      <p>
+        {error ||
+          (loading
+            ? "Loading analytics…"
+            : "Cell, row, column, and category accuracy use all tracked Basic Strategy decisions.")}
+      </p>
+      <button type="button" className="ghost-button" onClick={onRefresh} disabled={loading}>
+        Refresh
+      </button>
+      <button type="button" className="ghost-button is-off" onClick={onReset}>
+        Reset strategy analytics
+      </button>
+    </section>
+  );
+}
+
+function InsightList({ title, rows }: { title: string; rows: StrategyAnalyticsMetric[] }) {
+  return (
+    <div className="strategy-analytics-insight-list">
+      <h4>{title}</h4>
+      {rows.length ? (
+        rows.map(metric => <MetricPill metric={metric} key={metric.key} />)
+      ) : (
+        <p className="empty-state">No data</p>
+      )}
+    </div>
+  );
+}
+
+function StrategyAnalyticsInsights({ analytics }: { analytics: StrategyAnalyticsSummary | null }) {
+  return (
+    <section className="strategy-analytics-insights">
+      <h3>Strengths</h3>
+      <InsightList title="Cells" rows={analytics?.strengths.cells ?? []} />
+      <InsightList title="Rows" rows={analytics?.strengths.rows ?? []} />
+      <InsightList title="Dealer columns" rows={analytics?.strengths.dealerUpcards ?? []} />
+      <InsightList title="Categories" rows={analytics?.strengths.categories ?? []} />
+      <h3>Weaknesses</h3>
+      <InsightList title="Cells" rows={analytics?.weaknesses.cells ?? []} />
+      <InsightList title="Rows" rows={analytics?.weaknesses.rows ?? []} />
+      <InsightList title="Dealer columns" rows={analytics?.weaknesses.dealerUpcards ?? []} />
+      <InsightList title="Categories" rows={analytics?.weaknesses.categories ?? []} />
+    </section>
   );
 }

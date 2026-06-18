@@ -4,7 +4,9 @@ import { Hand } from "../../components/PlayingCard";
 import { TopBar } from "../../components/TopBar";
 import { api } from "../../lib/api";
 import { randomRank, type GameCard } from "../../lib/cards";
-import { StrategyChartPanel } from "./StrategyChartPanel";
+import { TrackingControls } from "../analytics/AnalyticsShared";
+import { trackStrategyAttempt } from "../analytics/tracker";
+import { StrategyChartPanel, type StrategyPanelMode } from "./StrategyChartPanel";
 import { StrategyRulesPanel } from "./StrategyRulesPanel";
 import {
   STRATEGY_ACTION_KEYS,
@@ -73,7 +75,7 @@ export function BasicStrategy() {
   }, [profileId, chartId, subsetId]);
   const [session, setSession] = useState<Session>(EMPTY_SESSION);
   const [criteria, setCriteria] = useState<StrategyCriteria>(defaultStrategyCriteria);
-  const [panelMode, setPanelMode] = useState<"review" | "edit" | null>(null);
+  const [panelMode, setPanelMode] = useState<StrategyPanelMode | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
   const dealTimer = useRef<number | null>(null);
 
@@ -186,22 +188,20 @@ export function BasicStrategy() {
 
   const recordAttempt = (action: string, dec: NonNullable<typeof decision>, correct: boolean) => {
     if (!serverAvailable || !dec.expectedAction) return;
-    api
-      .strategyAttempt({
-        ruleProfileId: profileId ?? undefined,
-        chartId: chartId ?? undefined,
-        subsetId: subsetId ?? undefined,
-        handNumber: session.handNumber,
-        category: dec.category,
-        rowKey: dec.rowKey,
-        dealerUpcard: dec.dealer,
-        playerCards: session.playerHand.map(card => ({ rank: card.rank, suit: card.suit })),
-        action,
-        expectedAction: dec.expectedAction,
-        correct,
-        responseTimeMs: Date.now() - (session.promptOpenedAt || Date.now())
-      })
-      .catch(() => {});
+    trackStrategyAttempt({
+      ruleProfileId: profileId ?? undefined,
+      chartId: chartId ?? undefined,
+      subsetId: subsetId ?? undefined,
+      handNumber: session.handNumber,
+      category: dec.category,
+      rowKey: dec.rowKey,
+      dealerUpcard: dec.dealer,
+      playerCards: session.playerHand.map(card => ({ rank: card.rank, suit: card.suit })),
+      action,
+      expectedAction: dec.expectedAction,
+      correct,
+      responseTimeMs: Date.now() - (session.promptOpenedAt || Date.now())
+    });
   };
 
   const submitAction = useCallback(
@@ -433,6 +433,9 @@ export function BasicStrategy() {
         <button type="button" className="ghost-button" onClick={() => setPanelMode("review")}>
           <span>Review chart</span>
         </button>
+        <button type="button" className="ghost-button" onClick={() => setPanelMode("analytics")}>
+          <span>Analytics</span>
+        </button>
         <button
           type="button"
           className="icon-button"
@@ -452,6 +455,8 @@ export function BasicStrategy() {
           Next prompt
         </button>
       </section>
+
+      <TrackingControls className="tracking-bar" />
 
       <section className="strategy-rules-strip" aria-label="Current house rules">
         <div className="strategy-rules-summary">

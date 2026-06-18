@@ -216,6 +216,7 @@ CREATE TABLE IF NOT EXISTS strategy_chart_imports (
 CREATE TABLE IF NOT EXISTS strategy_attempts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  session_id INTEGER,
   rule_profile_id INTEGER,
   chart_id INTEGER,
   subset_id INTEGER,
@@ -228,6 +229,7 @@ CREATE TABLE IF NOT EXISTS strategy_attempts (
   expected_action TEXT,
   correct INTEGER,
   response_time_ms INTEGER,
+  FOREIGN KEY (session_id) REFERENCES sessions(id),
   FOREIGN KEY (rule_profile_id) REFERENCES strategy_rule_profiles(id),
   FOREIGN KEY (chart_id) REFERENCES strategy_charts(id),
   FOREIGN KEY (subset_id) REFERENCES strategy_subsets(id)
@@ -259,6 +261,7 @@ function ensureSchemaColumns(): void {
     ensureColumn(table, "ms_since_previous_visible_card", "INTEGER");
   }
   ensureColumn("strategy_subsets", "is_default", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("strategy_attempts", "session_id", "INTEGER");
   ensureColumn("strategy_attempts", "hand_number", "INTEGER");
   ensureColumn("deck_countdown_rounds", "omitted_card_count", "INTEGER");
 }
@@ -270,6 +273,7 @@ export function cleanupEmptySessions(): void {
     AND NOT EXISTS (SELECT 1 FROM hands h WHERE h.session_id = sessions.id)
     AND NOT EXISTS (SELECT 1 FROM flash_rounds fr WHERE fr.session_id = sessions.id)
     AND NOT EXISTS (SELECT 1 FROM deck_countdown_rounds dcr WHERE dcr.session_id = sessions.id)
+    AND NOT EXISTS (SELECT 1 FROM strategy_attempts sa WHERE sa.session_id = sessions.id)
   `;
   runSql(`
     DELETE FROM shoes

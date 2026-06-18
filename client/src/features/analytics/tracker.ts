@@ -5,7 +5,8 @@ import type {
   DeckCountdownRoundSubmittedRequest,
   FlashRoundSubmittedRequest,
   HandCompletedRequest,
-  ShoeEndedRequest
+  ShoeEndedRequest,
+  StrategyAttemptRequest
 } from "@blackjack/shared";
 import { api } from "../../lib/api";
 
@@ -186,6 +187,20 @@ export function trackDeckCountdownRound(
     .then(sessionId => {
       if (!sessionId) return;
       return api.deckCountdownRoundSubmitted({ ...payload, sessionId });
+    })
+    .then(() => onRecorded?.())
+    .catch(() => {});
+}
+
+export function trackStrategyAttempt(
+  payload: Omit<StrategyAttemptRequest, "sessionId">,
+  onRecorded?: () => void
+): void {
+  if (!shouldTrack()) return;
+  ensureSession()
+    .then(sessionId => {
+      if (!sessionId) return;
+      return api.strategyAttempt({ ...payload, sessionId });
     })
     .then(() => onRecorded?.())
     .catch(() => {});

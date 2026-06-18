@@ -8,6 +8,7 @@ export const eventsRouter = Router();
 eventsRouter.post("/events/strategy-attempt", (req, res) => {
   const body = req.body || {};
   const row = insert("strategy_attempts", {
+    session_id: body.sessionId,
     rule_profile_id: body.ruleProfileId,
     chart_id: body.chartId,
     subset_id: body.subsetId,

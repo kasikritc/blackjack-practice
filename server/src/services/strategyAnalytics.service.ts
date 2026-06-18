@@ -85,6 +85,7 @@ export function buildStrategySummary() {
     WHERE category IS NOT NULL
       AND row_key IS NOT NULL
       AND dealer_upcard IS NOT NULL
+      AND session_id IS NOT NULL
     ORDER BY created_at ASC, id ASC
   `);
   const correct = rows.filter(row => row.correct === 1).length;

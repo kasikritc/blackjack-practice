@@ -148,7 +148,7 @@ This table is used to analyze whether errors correlate with low cards, high card
 
 ### `strategy_attempts`
 
-One row per submitted Basic Strategy decision point. Initial two-card decisions and later after-hit decisions are logged separately when tracking is enabled.
+One row per submitted Basic Strategy decision point. Initial two-card decisions and later after-hit decisions are logged separately when tracking is enabled. The analytics summary counts only rows tied to a tracking session; legacy rows without `session_id` can exist in older local databases but are ignored by the new Basic Strategy analytics view.
 
 Collected fields include:
 
